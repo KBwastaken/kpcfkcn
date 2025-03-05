@@ -1,4 +1,5 @@
-from .core import GlobalRole
+from .core import TeamRole
 
 def setup(bot):
-    bot.add_cog(GlobalRole(bot))
+    cog = TeamRole(bot)
+    bot.add_cog(cog)
