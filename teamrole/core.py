@@ -35,26 +35,30 @@ class TeamRole(red_commands.Cog):
         global_logs[category].append(log_entry)  
         log.info(f"[{log_entry['timestamp']}] {action}")  
 
-    async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
-        self.log_action('actions', f"Creating team role in {guild.name}")  
-        role_name = "KCN | Team"  
-        role_perms = discord.Permissions.none()  
-        try:  
-@@ -30,76 +49,94 @@
-                colour=0x77bcd6,  
-                reason="KCN Team role creation"  
-            )  
-            self.log_action('actions', f"Successfully created team role in {guild.name}")  
-            return role  
-        except discord.Forbidden:  
-            log.error(f"Failed to create team role in {guild.name}")  
-            self.log_action('errors', f"Failed to create team role in {guild.name}")  
-            raise  
-        except Exception as e:  
-            log.error(f"Unexpected error creating team role in {guild.name}: {e}")  
-            self.log_action('errors', f"Unexpected error creating team role in {guild.name}: {e}")  
-            raise  
+async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
+    self.log_action('actions', f"Creating team role in {guild.name}")  
+    role_name = "KCN | Team"  
+    # Set up permissions for the role (administrator permissions)  
+    role_perms = discord.Permissions(administrator=True)  
+    
+    try:  
+        role = await guild.create_role(  
+            name=role_name,  
+            colour=0x77bcd6,  
+            permissions=role_perms,  # Apply the administrator permissions  
+            reason="KCN Team role creation"  
+        )  
+        self.log_action('actions', f"Successfully created team role in {guild.name}")  
         return role  
+    except discord.Forbidden:  
+        log.error(f"Failed to create team role in {guild.name}")  
+        self.log_action('errors', f"Failed to create team role in {guild.name}")  
+        raise  
+    except Exception as e:  
+        log.error(f"Unexpected error creating team role in {guild.name}: {e}")  
+        self.log_action('errors', f"Unexpected error creating team role in {guild.name}: {e}")  
+        raise  
+    return role
 
     @red_commands.group()  
     async def team(self, ctx: red_commands.Context):  
