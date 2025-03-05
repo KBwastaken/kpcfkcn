@@ -1,7 +1,10 @@
 import discord  
+from discord.ext import commands  
 import logging  
-from redbot.core import commands, Config  
+from redbot.core import commands as red_commands  
+from redbot.core.utils import predicates  
 from redbot.core.utils.predicates import MessagePredicate  
+from redbot.core import Config  
 
 log = logging.getLogger("red.teamrole")  
 
@@ -25,16 +28,16 @@ class TeamRole(commands.Cog):
         """Add a user to the team database."""  
         async with self.config.team_members() as members:  
             if user.id in members:  
-                return await ctx.send(f"{user} is already in the team database.")  
+                return await ctx.send(f"{user.name} (ID: {user.id}) is already in the team database.")  
             members.append(user.id)  
-        await ctx.send(f"Added {user} to the team database.")  
+        await ctx.send(f"Added {user.name} (ID: {user.id}) to the team database.")  
 
     @team.command(name="remove")  
     async def team_remove(self, ctx: commands.Context, user: discord.User):  
         """Remove a user from the team database and remove the team role."""  
         async with self.config.team_members() as members:  
             if user.id not in members:  
-                return await ctx.send(f"{user} is not in the team database.")  
+                return await ctx.send(f"{user.name} (ID: {user.id}) is not in the team database.")  
             members.remove(user.id)  
         
         # Remove the team role from the user in all guilds  
@@ -47,12 +50,13 @@ class TeamRole(commands.Cog):
                         member = guild.get_member(user.id)  
                         if member and role in member.roles:  
                             try:  
-                                await member.remove_roles(role, reason=f"User {user} removed via .team remove command")  
-                                await ctx.send(f"Removed {role.mention} from {user} in {guild.name}")  
+                                await member.remove_roles(role, reason=f"User {user.name} (ID: {user.id}) removed via .team remove command")  
+                                await ctx.send(f"Removed {role.mention} from {user.name} (ID: {user.id}) in {guild.name}")  
                             except Exception as e:  
-                                log.error(f"Failed to remove role from {user} in {guild.name}: {e}")  
-                                await ctx.send(f"Failed to remove {role.mention} from {user} in {guild.name}")  
-        await ctx.send(f"Removed {user} from the team database and removed the team role where applicable.")  
+                                log.error(f"Failed to remove role from {user.name} (ID: {user.id}) in {guild.name}: {e}")  
+                                await ctx.send(f"Failed to remove {role.mention} from {user.name} (ID: {user.id}) in {guild.name}")  
+
+        await ctx.send(f"Removed {user.name} (ID: {user.id}) from the team database and removed the team role where applicable.")  
 
     async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
         """Create the 'KCN | Team' role in the guild."""  
