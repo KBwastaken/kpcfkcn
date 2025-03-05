@@ -13,19 +13,27 @@ global_logs = {
     'actions': [],  
     'errors': []  
 }  
-
-class TeamRole(red_commands.Cog):  
-    """Cog for creating and managing a team role across servers."""  
-
-@@ -17,10 +25,21 @@
-            team_role_id=None  
+class TeamRole(commands.Cog):  
+    def __init__(self, bot):  
+        self.bot = bot  
+        self.config = Config(  
+            name="TeamRole",  
+            identifier="teamrole",  
+            version="1.0"  
         )  
         self.config.register_global(  
-            team_members=[]  
             team_members=[],  
             logs_enabled=True  
         )  
         self.log_time_format = "%Y-%m-%d %H:%M:%S"  
+
+    def log_action(self, category, action):  
+        log_entry = {  
+            'timestamp': datetime.now().strftime(self.log_time_format),  
+            'details': action  
+        }  
+        global_logs[category].append(log_entry)  
+        log.info(f"[{log_entry['timestamp']}] {action}")
 
     def log_action(self, category, action):  
         log_entry = {  
