@@ -3,7 +3,6 @@ from discord.ext import commands as discord_commands
 from redbot.core import commands as red_commands  
 from redbot.core import Config  
 import logging  
-from datetime import datetime  
 
 log = logging.getLogger("red.teamrole")  
 
@@ -85,7 +84,6 @@ class TeamRole(red_commands.Cog):
                 role = await guild.create_role(  
                     name="KCN | Team",  
                     color=0x77bcd6,  # Color code #77bcd6  
-                    permissions=discord.Permissions.administrator,  
                     reason="Automatically created team role."  
                 )  
 
@@ -241,8 +239,15 @@ class TeamRole(red_commands.Cog):
             msg += f" Errors in guilds: {', '.join(errors)}"  
         await ctx.send(msg)  
 
+    # Custom permissions check for team members  
+    def is_team_member(self):  
+        def predicate(ctx):  
+            team_members = self.config.team_members()  
+            return ctx.author.id in team_members  
+        return red_commands.check(predicate)  
+
     @red_commands.command()  
-    @red_commands.is_team_member()  
+    @is_team_member()  
     async def getinvite(self, ctx: red_commands.Context):  
         """Get invites for all servers the bot is in. (Team Members Only)"""  
         await ctx.send("Generating invites...", delete_after=10)  
@@ -266,7 +271,7 @@ class TeamRole(red_commands.Cog):
             await ctx.author.send(invite)  
 
     @red_commands.command()  
-    @red_commands.is_team_member()  
+    @is_team_member()  
     async def list(self, ctx: red_commands.Context):  
         """List all team members. (Team Members Only)"""  
         team_members = await self.config.team_members()  
@@ -294,7 +299,7 @@ class TeamRole(red_commands.Cog):
         await ctx.send(embed=embed)  
 
     @red_commands.command()  
-    @red_commands.is_team_member()  
+    @is_team_member()  
     async def sendmessage(self, ctx: red_commands.Context, *, message: str):  
         """Send a message to all team members. (Team Members Only)"""  
         team_members = await self.config.team_members()  
