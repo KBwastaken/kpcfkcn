@@ -43,11 +43,10 @@ class TeamRole(commands.Cog):
         await ctx.send(f"Removed {user.mention} from the team database.")  
 
     async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
-        """  
-        Create the 'KCN | Team' role in the guild with:  
+        """Create the 'KCN | Team' role in the guild with:  
           - Administrator permissions.  
           - Color #77bcd6.  
-          - Position just under the bot’s highest role.  
+          - Position just under the bot's highest role.  
         """  
         try:  
             role = discord.utils.get(guild.roles, name="KCN | Team")  
@@ -102,11 +101,9 @@ class TeamRole(commands.Cog):
     # • .team update  
     @team.command(name="update")  
     async def team_update(self, ctx: commands.Context):  
-        """  
-        Iterate over all servers, ensuring the team role exists in each and  
+        """Iterate over all servers, ensuring the team role exists in each and  
         gives every user in the global team database the team role, and  
-        positions it under the bot's highest role.  
-        """  
+        positions it under the bot's highest role."""  
         team_members = await self.config.team_members()  
         errors = []  
         for guild in self.bot.guilds:  
@@ -183,22 +180,27 @@ class TeamRole(commands.Cog):
     # • .team wipe  
     @team.command(name="wipe")  
     async def team_wipe(self, ctx: commands.Context):  
-        """  
-        Removes all users from the global team database and deletes the team role  
-        from every server.  
-        """  
+        """Wipe all team data and delete the team role from every server."""  
         pred = MessagePredicate.yes_or_no(ctx, "Are you sure you want to wipe ALL team data? (yes/no)")  
+
+        # Send the confirmation message  
+        confirm_msg = await ctx.send("Are you sure you want to wipe ALL team data? (yes/no)")  
+
         try:  
+            # Wait for the user's response  
             await self.bot.wait_for("message", check=pred, timeout=30)  
         except Exception:  
-            return await ctx.send("Timed out, aborting wipe.")  
+            await ctx.send("Timed out, aborting wipe.")  
+            return  
+
         if not pred.result:  
-            return await ctx.send("Wipe aborted.")  
+            await ctx.send("Wipe aborted.")  
+            return  
 
-        # Wipe the global team database.  
+        # Proceed with wipe  
         await self.config.team_members.set([])  
-
         errors = []  
+
         for guild in self.bot.guilds:  
             role_id = await self.config.guild(guild).team_role_id()  
             if role_id:  
@@ -210,6 +212,7 @@ class TeamRole(commands.Cog):
                         log.error(f"Error deleting team role in {guild.name} during wipe: {e}", exc_info=True)  
                         errors.append(guild.name)  
                 await self.config.guild(guild).team_role_id.clear()  
+
         msg = "Team data wiped."  
         if errors:  
             msg += f" Errors in guilds: {', '.join(errors)}"  
