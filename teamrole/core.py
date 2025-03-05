@@ -11,10 +11,12 @@ log = logging.getLogger("red.teamrole")
 
 class TeamRole(commands.Cog):
     def __init__(self, bot):
+        print("[TeamRole] Initializing cog...")  # Debugging statement
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_global(team_members=[])
         self.config.register_guild(team_role_id=None)
+        print("[TeamRole] Cog initialized!")  # Debugging statement
 
     async def is_bot_owner(self, ctx):
         """Check if the user is the bot owner."""
