@@ -1,7 +1,7 @@
 import discord
 import logging
 
-log = logging.getLogger("red.globalrole")
+log = logging.getLogger("red.teamrole")
 
 async def create_team_role(guild, bot):
     """Create the 'KCN | Team' role in a guild."""
