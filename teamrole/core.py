@@ -7,9 +7,9 @@ from redbot.core.utils.menus import menu, DEFAULT_CONTROLS
 
 from .utils import create_team_role
 
-log = logging.getLogger("red.globalrole")
+log = logging.getLogger("red.teamrole")
 
-class GlobalRole(commands.Cog):
+class TeamRole(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
