@@ -307,7 +307,7 @@ class TeamRole(red_commands.Cog):
 
                 if user:  
                     embed.add_field(  
-                        name=user.mention,  
+                        name=f"<@!{user_id}>",  
                         value=f"Username: {user} | ID: {user_id}",  
                         inline=False  
                     )  
