@@ -1,0 +1,12 @@
+{
+    "author": ["kaya"],
+    "install_msg": "Thank you for installing the GlobalRole cog!",
+    "name": "GlobalRole",
+    "short": "Manage a global 'KCN | Team' role across servers.",
+    "description": "A cog to create and manage a global 'KCN | Team' role with admin permissions.",
+    "tags": ["role", "global", "team", "admin"],
+    "requirements": [],
+    "hidden": false,
+    "disabled": false,
+    "type": "COG"
+}
