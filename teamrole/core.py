@@ -1,8 +1,6 @@
 import discord  
 from discord.ext import commands as discord_commands  
 from redbot.core import commands as red_commands  
-from redbot.core.utils import predicates, modding  
-from redbot.core.utils.predicates import MessagePredicate  
 from redbot.core import Config  
 import logging  
 
@@ -54,7 +52,7 @@ class TeamRole(red_commands.Cog):
                         member = guild.get_member(user.id)  
                         if member and role in member.roles:  
                             try:  
-                                await member.remove_roles(role, reason=f"User removed via team remove command")  
+                                await member.remove_roles(role, reason="User removed via team remove command")  
                                 await ctx.send(f"Removed {role.mention} from {user} in {guild.name}")  
                             except Exception as e:  
                                 log.error(f"Failed to remove role from {user} in {guild.name}: {e}")  
@@ -137,7 +135,7 @@ class TeamRole(red_commands.Cog):
 
             for user_id in team_members:  
                 member = guild.get_member(user_id)  
-                if member and role not in member.roles:  
+                if member and role and role not in member.roles:  
                     try:  
                         await member.add_roles(role, reason="Team update command")  
                         log.info(f"Added {role} to {user_id} in {guild.name}")  
