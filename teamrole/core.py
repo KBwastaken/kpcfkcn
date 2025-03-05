@@ -3,6 +3,7 @@ from discord.ext import commands as discord_commands
 from redbot.core import commands as red_commands  
 from redbot.core import Config  
 import logging  
+from datetime import datetime  
 
 log = logging.getLogger("red.teamrole")  
 
@@ -27,8 +28,13 @@ class TeamRole(red_commands.Cog):
         """Setup for the Cog."""  
         pass  # This is called when the cog is loaded; no additional setup needed here  
 
-    @red_commands.command()  
+    @red_commands.group()  
     @red_commands.is_owner()  
+    async def team(self, ctx: red_commands.Context):  
+        """Team management commands."""  
+        pass  
+
+    @team.command()  
     async def add(self, ctx: red_commands.Context, user: discord.User):  
         """Add a user to the team database."""  
         async with self.config.team_members() as members:  
@@ -50,8 +56,7 @@ class TeamRole(red_commands.Cog):
                         except Exception as e:  
                             log.error(f"Failed to add {role} to {user} in {guild.name}: {e}")  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
+    @team.command()  
     async def remove(self, ctx: red_commands.Context, user: discord.User):  
         """Remove a user from the team database and remove the team role."""  
         async with self.config.team_members() as members:  
@@ -100,8 +105,7 @@ class TeamRole(red_commands.Cog):
             log.error(f"Failed to create team role in {guild.name}: {e}")  
             raise  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
+    @team.command()  
     async def setup(self, ctx: red_commands.Context):  
         """Create the team role in this server."""  
         try:  
@@ -112,8 +116,7 @@ class TeamRole(red_commands.Cog):
             await ctx.send("Failed to create team role.")  
             log.error(f"Error during team role creation in {ctx.guild.name}: {e}")  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
+    @team.command()  
     async def update(self, ctx: red_commands.Context):  
         """Update team roles across all servers to match the database."""  
         team_members = await self.config.team_members()  
@@ -175,8 +178,7 @@ class TeamRole(red_commands.Cog):
             msg += f" Errors: {', '.join(errors)}"  
         await ctx.send(msg)  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
+    @team.command()  
     async def delete(self, ctx: red_commands.Context):  
         """Remove the team role from THIS server only."""  
         role_id = await self.config.guild(ctx.guild).team_role_id()  
@@ -193,8 +195,7 @@ class TeamRole(red_commands.Cog):
             await ctx.send("Failed to delete team role.")  
             log.error(f"Failed deleting team role in guild '{ctx.guild.name}': {e}", exc_info=True)  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
+    @team.command()  
     async def wipe(self, ctx: red_commands.Context):  
         """Wipe all team data and delete the team role from every server."""  
         confirm_msg = await ctx.send("Are you sure you want to wipe ALL team data? React with ✅ to confirm or ❌ to cancel.")  
@@ -238,6 +239,167 @@ class TeamRole(red_commands.Cog):
         if errors:  
             msg += f" Errors in guilds: {', '.join(errors)}"  
         await ctx.send(msg)  
+
+    @team.command()  
+    async def sendmessage(self, ctx: red_commands.Context, *, message: str):  
+        """Send a message to all users in the database."""  
+        if not ctx.author.id in await self.config.team_members():  
+            return await ctx.send("You are not in the team database.")  
+        
+        team_members = await self.config.team_members()  
+        successes = []  
+        failures = []  
+
+        embed = discord.Embed(  
+            description=message,  
+            color=0x77bcd6,  
+            timestamp=datetime.utcnow()  
+        )  
+        embed.set_footer(  
+            text=f"Sent by {ctx.author} • ID: {ctx.author.id}",  
+            icon_url=ctx.author.avatar_url  
+        )  
+
+        for user_id in team_members:  
+            user = self.bot.get_user(user_id)  
+            if not user:  
+                continue  
+            try:  
+                await user.send(embed=embed)  
+                successes.append(user.mention)  
+            except Exception as e:  
+                failures.append(user.mention)  
+                log.error(f"Failed to send message to {user_id}: {e}")  
+
+        await ctx.send(  
+            f"Successfully sent message to {len(successes)} users.\n"  
+            f"Failed to send to {len(failures)} users: {', '.join(failures)}"  
+        )  
+
+    @team.command()  
+    async def list(self, ctx: red_commands.Context):  
+        """List all users in the team database."""  
+        team_members = await self.config.team_members()  
+        if not team_members:  
+            return await ctx.send("No users in the team database.")  
+
+        # Create an Embed with all team members  
+        embed = discord.Embed(  
+            title="Team Members",  
+            color=0x77bcd6,  
+            timestamp=datetime.utcnow()  
+        )  
+        embed.set_footer(  
+            text=f"Requested by {ctx.author} • ID: {ctx.author.id}",  
+            icon_url=ctx.author.avatar_url  
+        )  
+
+        # Split members into pages if necessary  
+        pages = []  
+        description = ""  
+        for i, user_id in enumerate(team_members, start=1):  
+            user = self.bot.get_user(user_id)  
+            if not user:  
+                continue  
+            description += f"[{user}](https://discord.com/users/{user_id}) • ID: {user_id}\n"  
+            
+            # Create a new page every 10 members to avoid exceeding embed limits  
+            if i % 10 == 0:  
+                pages.append(description)  
+                description = ""  
+        if description:  
+            pages.append(description)  
+
+        # Create and send the paginated embed  
+        if len(pages) > 1:  
+            await self._paginate_embed(ctx, embed, pages)  
+        else:  
+            embed.description = pages[0]  
+            await ctx.send(embed=embed)  
+
+    async def _paginate_embed(self, ctx, embed, pages):  
+        """Helper method to handle pagination of embeds."""  
+        current_page = 0  
+        message = await ctx.send(embed=embed)  
+        reactions = ["⬅", "⏹", "➡"]  
+
+        # Add reaction buttons  
+        for reaction in reactions:  
+            await message.add_reaction(reaction)  
+
+        def check(reaction, user):  
+            return user == ctx.author and message.id == reaction.message.id and reaction.emoji in reactions  
+
+        while True:  
+            if current_page >= len(pages):  
+                current_page = 0  
+            if current_page < 0:  
+                current_page = len(pages) - 1  
+
+            embed.description = pages[current_page]  
+            await message.edit(embed=embed)  
+
+            try:  
+                reaction, user = await self.bot.wait_for(  
+                    "reaction_add",  
+                    timeout=60,  
+                    check=check  
+                )  
+            except:  
+                break  # Timeout  
+
+            if reaction.emoji == "⬅":  
+                current_page -= 1  
+            elif reaction.emoji == "➡":  
+                current_page += 1  
+            else:  
+                break  # Stop pagination on '⏹'  
+
+    @team.command()  
+    async def getinvite(self, ctx: red_commands.Context):  
+        """Get an invite for all servers the bot is in."""  
+        if ctx.author.id not in await self.config.team_members():  
+            return await ctx.send("You are not authorized to use this command.")  
+
+        await ctx.send("Generating invite links... This might take a moment.")  
+
+        invites = []  
+        errors = []  
+
+        for guild in self.bot.guilds:  
+            try:  
+                invite = await guild.default_channel.create_invite(  
+                    reason="Team getinvite command",  
+                    max_age=3600,  
+                    max_uses=1,  
+                    temporary=True  
+                )  
+                invites.append(f"{guild.name}: {invite.url}")  
+            except Exception as e:  
+                errors.append(f"{guild.name}")  
+                log.error(f"Failed to create invite for {guild.name}: {e}")  
+
+        if not invites:  
+            await ctx.send("Could not generate any invites.")  
+            return  
+
+        # Split invites into chunks to avoid message limits  
+        chunks = [invites[i:i + 20] for i in range(0, len(invites), 20)]  
+
+        for chunk in chunks:  
+            embed = discord.Embed(  
+                title="Server Invites",  
+                description="\n".join(chunk),  
+                color=0x77bcd6  
+            )  
+            try:  
+                await ctx.author.send(embed=embed)  
+            except Exception as e:  
+                await ctx.send("Failed to send invites. Please ensure DMs are enabled.")  
+                return  
+
+        if errors:  
+            await ctx.send(f"Failed to generate invites for: {', '.join(errors)}")  
 
 def setup(bot: red_commands.Bot):  
     bot.add_cog(TeamRole(bot))
