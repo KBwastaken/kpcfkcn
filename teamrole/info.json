@@ -1,9 +1,0 @@
-{
-    "name": "TeamRole",
-    "author": ["YourName"],
-    "description": "Automatically manages a global team role across servers.",
-    "install_msg": "Thank you for installing",
-    "required_cogs": [],
-    "requirements": [],
-    "tags": ["roles", "management", "global"]
-}
