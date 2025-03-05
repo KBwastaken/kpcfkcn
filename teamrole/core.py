@@ -183,28 +183,34 @@ class TeamRole(red_commands.Cog):
     @team.command(name="wipe")  
     async def team_wipe(self, ctx: red_commands.Context):  
         """Wipe all team data and delete the team role from every server."""  
-        # Confirmation prompt  
-        pred = MessagePredicate.yes_or_no(ctx, "Are you sure you want to wipe ALL team data? (yes/no)")  
+        # Send the confirmation message with reactions  
+        confirm_msg = await ctx.send("Are you sure you want to wipe ALL team data? React with ✅ to confirm or ❌ to cancel.")  
         
-        # Send the confirmation message  
-        confirm_msg = await ctx.send("Are you sure you want to wipe ALL team data? (yes/no)")  
+        # Add reactions to the confirmation message  
+        await confirm_msg.add_reaction("✅")  
+        await confirm_msg.add_reaction("❌")  
+        
+        # Wait for the user's reaction  
+        def reaction_check(reaction, user):  
+            return user == ctx.author and reaction.message.id == confirm_msg.id and reaction.emoji in ("✅", "❌")  
         
         try:  
-            # Wait for the user's response  
-            msg = await self.bot.wait_for("message", check=pred, timeout=30)  
-            if msg.author != ctx.author:  
-                await ctx.send("Only the command invoker can confirm the wipe.")  
-                return  
+            reaction, _ = await self.bot.wait_for("reaction_add", check=reaction_check, timeout=60)  
+            if reaction.emoji == "✅":  
+                # Proceed with the wipe  
+                await confirm_msg.delete()  
+                await self._wipe_process(ctx)  
+            else:  
+                # Cancel the wipe  
+                await confirm_msg.delete()  
+                await ctx.send("Wipe cancelled.")  
         except Exception as e:  
-            await ctx.send("Timed out, aborting wipe.")  
+            await ctx.send("Timed out. Wipe aborted.")  
             log.error(f"Error during .team wipe confirmation: {e}")  
-            return  
-        
-        if not pred.result:  
-            await ctx.send("Wipe aborted.")  
-            return  
-        
-        # Proceed with wipe  
+            await confirm_msg.delete()  
+
+    async def _wipe_process(self, ctx: red_commands.Context):  
+        """Internal method to handle the actual wiping of team data."""  
         await self.config.team_members.set([])  
         errors = []  
         
