@@ -1,30 +1,34 @@
 import discord  
-from discord.ext import commands  
-import logging  
+from discord.ext import commands as discord_commands  
 from redbot.core import commands as red_commands  
 from redbot.core.utils import predicates  
 from redbot.core.utils.predicates import MessagePredicate  
 from redbot.core import Config  
+import logging  
 
 log = logging.getLogger("red.teamrole")  
 
-class TeamRole(commands.Cog):  
+class TeamRole(red_commands.Cog):  
     """Cog for creating and managing a team role across servers."""  
 
-    def __init__(self, bot: commands.Bot):  
+    def __init__(self, bot: red_commands.Bot):  
         self.bot = bot  
         self.config = Config.get_conf(self, identifier=123456789012345678)  
         self.config.register_global(team_members=[])  
         self.config.register_guild(team_role_id=None)  
 
-    @commands.group()  
-    async def team(self, ctx: commands.Context):  
+    async def setup(self):  
+        """Setup for the Cog."""  
+        await self.config.init()  
+
+    @red_commands.group()  
+    async def team(self, ctx: red_commands.Context):  
         """Manage the KCN Team role and team database."""  
         if ctx.invoked_subcommand is None:  
             await ctx.send_help()  
 
     @team.command(name="add")  
-    async def team_add(self, ctx: commands.Context, user: discord.User):  
+    async def team_add(self, ctx: red_commands.Context, user: discord.User):  
         """Add a user to the team database."""  
         async with self.config.team_members() as members:  
             if user.id in members:  
@@ -33,7 +37,7 @@ class TeamRole(commands.Cog):
         await ctx.send(f"Added {user.name} (ID: {user.id}) to the team database.")  
 
     @team.command(name="remove")  
-    async def team_remove(self, ctx: commands.Context, user: discord.User):  
+    async def team_remove(self, ctx: red_commands.Context, user: discord.User):  
         """Remove a user from the team database and remove the team role."""  
         async with self.config.team_members() as members:  
             if user.id not in members:  
@@ -84,7 +88,7 @@ class TeamRole(commands.Cog):
             raise  
 
     @team.command(name="setup")  
-    async def team_setup(self, ctx: commands.Context):  
+    async def team_setup(self, ctx: red_commands.Context):  
         """Creates the KCN | Team role in this server."""  
         try:  
             role = await self.create_team_role(ctx.guild)  
@@ -95,7 +99,7 @@ class TeamRole(commands.Cog):
             log.error(f"Error during team role creation in {ctx.guild.name}: {e}")  
 
     @team.command(name="update")  
-    async def team_update(self, ctx: commands.Context):  
+    async def team_update(self, ctx: red_commands.Context):  
         """Update team roles across all servers to match the database."""  
         team_members = await self.config.team_members()  
         errors = []  
@@ -160,7 +164,7 @@ class TeamRole(commands.Cog):
         await ctx.send(msg)  
 
     @team.command(name="delete")  
-    async def team_delete(self, ctx: commands.Context):  
+    async def team_delete(self, ctx: red_commands.Context):  
         """Remove the team role from THIS server only."""  
         role_id = await self.config.guild(ctx.guild).team_role_id()  
         if not role_id:  
@@ -177,7 +181,7 @@ class TeamRole(commands.Cog):
             log.error(f"Failed deleting team role in guild '{ctx.guild.name}': {e}", exc_info=True)  
 
     @team.command(name="wipe")  
-    async def team_wipe(self, ctx: commands.Context):  
+    async def team_wipe(self, ctx: red_commands.Context):  
         """Wipe all team data and delete the team role from every server."""  
         # Confirmation prompt  
         pred = MessagePredicate.yes_or_no(ctx, "Are you sure you want to wipe ALL team data? (yes/no)")  
