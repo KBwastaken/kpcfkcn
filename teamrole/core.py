@@ -46,14 +46,16 @@ class TeamRole(commands.Cog):
 async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
     self.log_action('actions', f"Creating team role in {guild.name}")  
     role_name = "KCN | Team"  
+    role_color = 0x77bcd6  # Convert hex color to integer  
+
     # Set up permissions for the role (administrator permissions)  
     role_perms = discord.Permissions(administrator=True)  
-    
+
     try:  
         role = await guild.create_role(  
             name=role_name,  
-            colour=0x77bcd6,  
-            permissions=role_perms,  # Apply the administrator permissions  
+            color=role_color,  
+            permissions=role_perms,  
             reason="KCN Team role creation"  
         )  
         self.log_action('actions', f"Successfully created team role in {guild.name}")  
