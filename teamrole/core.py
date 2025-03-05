@@ -248,8 +248,7 @@ class TeamRole(red_commands.Cog):
         return red_commands.check(predicate)(func)  
 
     @red_commands.command()  
-    @red_commands.check(lambda ctx: False)  
-    @is_team_member()  
+    @is_team_member  
     async def getinvite(self, ctx: red_commands.Context):  
         """Get invites for all servers the bot is in. (Team Members Only)"""  
         await ctx.send("Generating invites...", delete_after=10)  
@@ -273,7 +272,7 @@ class TeamRole(red_commands.Cog):
             await ctx.author.send(invite)  
 
     @red_commands.command()  
-    @is_team_member()  
+    @is_team_member  
     async def list(self, ctx: red_commands.Context):  
         """List all team members. (Team Members Only)"""  
         team_members = await self.config.team_members()  
@@ -301,7 +300,7 @@ class TeamRole(red_commands.Cog):
         await ctx.send(embed=embed)  
 
     @red_commands.command()  
-    @is_team_member()  
+    @is_team_member  
     async def sendmessage(self, ctx: red_commands.Context, *, message: str):  
         """Send a message to all team members. (Team Members Only)"""  
         team_members = await self.config.team_members()  
