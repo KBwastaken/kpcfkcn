@@ -25,16 +25,16 @@ class TeamRole(commands.Cog):
         """Add a user to the team database."""  
         async with self.config.team_members() as members:  
             if user.id in members:  
-                return await ctx.send(f"{user.mention} is already in the team database.")  
+                return await ctx.send(f"{user} is already in the team database.")  
             members.append(user.id)  
-        await ctx.send(f"Added {user.mention} to the team database.")  
+        await ctx.send(f"Added {user} to the team database.")  
 
     @team.command(name="remove")  
     async def team_remove(self, ctx: commands.Context, user: discord.User):  
         """Remove a user from the team database and remove the team role."""  
         async with self.config.team_members() as members:  
             if user.id not in members:  
-                return await ctx.send(f"{user.mention} is not in the team database.")  
+                return await ctx.send(f"{user} is not in the team database.")  
             members.remove(user.id)  
         
         # Remove the team role from the user in all guilds  
@@ -48,11 +48,11 @@ class TeamRole(commands.Cog):
                         if member and role in member.roles:  
                             try:  
                                 await member.remove_roles(role, reason=f"User {user} removed via .team remove command")  
-                                await ctx.send(f"Removed {role.mention} from {user.mention} in {guild.name}")  
+                                await ctx.send(f"Removed {role.mention} from {user} in {guild.name}")  
                             except Exception as e:  
                                 log.error(f"Failed to remove role from {user} in {guild.name}: {e}")  
-                                await ctx.send(f"Failed to remove {role.mention} from {user.mention} in {guild.name}")  
-        await ctx.send(f"Removed {user.mention} from the team database and removed the team role where applicable.")  
+                                await ctx.send(f"Failed to remove {role.mention} from {user} in {guild.name}")  
+        await ctx.send(f"Removed {user} from the team database and removed the team role where applicable.")  
 
     async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
         """Create the 'KCN | Team' role in the guild."""  
@@ -133,10 +133,10 @@ class TeamRole(commands.Cog):
                 if member and role not in member.roles:  
                     try:  
                         await member.add_roles(role, reason="Team update command")  
-                        log.info(f"Added {role} to {member} in {guild.name}")  
+                        log.info(f"Added {role} to {user_id} in {guild.name}")  
                     except Exception as e:  
-                        log.error(f"Failed to add {role} to {member} in {guild.name}: {e}")  
-                        errors.append(f"{guild.name} - Failed to add role to {member.id}")  
+                        log.error(f"Failed to add {role} to {user_id} in {guild.name}: {e}")  
+                        errors.append(f"{guild.name} - Failed to add role to {user_id}")  
             
             # Second, remove roles from users who shouldn't have them  
             for member in guild.members:  
@@ -145,9 +145,9 @@ class TeamRole(commands.Cog):
                 if role in member.roles:  
                     try:  
                         await member.remove_roles(role, reason="Team update command - Removing unauthorized role")  
-                        log.info(f"Removed {role} from {member} in {guild.name}")  
+                        log.info(f"Removed {role} from {member.id} in {guild.name}")  
                     except Exception as e:  
-                        log.error(f"Failed to remove {role} from {member} in {guild.name}: {e}")  
+                        log.error(f"Failed to remove {role} from {member.id} in {guild.name}: {e}")  
                         errors.append(f"{guild.name} - Failed to remove role from {member.id}")  
 
         msg = "Team update complete."  
@@ -175,29 +175,31 @@ class TeamRole(commands.Cog):
     @team.command(name="wipe")  
     async def team_wipe(self, ctx: commands.Context):  
         """Wipe all team data and delete the team role from every server."""  
+        # Confirmation prompt  
         pred = MessagePredicate.yes_or_no(ctx, "Are you sure you want to wipe ALL team data? (yes/no)")  
-
+        
         # Send the confirmation message  
         confirm_msg = await ctx.send("Are you sure you want to wipe ALL team data? (yes/no)")  
-
+        
         try:  
             # Wait for the user's response  
             msg = await self.bot.wait_for("message", check=pred, timeout=30)  
             if msg.author != ctx.author:  
                 await ctx.send("Only the command invoker can confirm the wipe.")  
                 return  
-        except Exception:  
+        except Exception as e:  
             await ctx.send("Timed out, aborting wipe.")  
+            log.error(f"Error during .team wipe confirmation: {e}")  
             return  
-
+        
         if not pred.result:  
             await ctx.send("Wipe aborted.")  
             return  
-
+        
         # Proceed with wipe  
         await self.config.team_members.set([])  
         errors = []  
-
+        
         for guild in self.bot.guilds:  
             role_id = await self.config.guild(guild).team_role_id()  
             if role_id:  
@@ -206,10 +208,10 @@ class TeamRole(commands.Cog):
                     try:  
                         await role.delete(reason="Team wipe via .team wipe command")  
                     except Exception as e:  
-                        log.error(f"Error deleting team role in {guild.name} during wipe: {e}", exc_info=True)  
+                        log.error(f"Error deleting team role in {guild.name} during wipe: {e}")  
                         errors.append(guild.name)  
                 await self.config.guild(guild).team_role_id.clear()  
-
+        
         msg = "Team data wiped."  
         if errors:  
             msg += f" Errors in guilds: {', '.join(errors)}"  
