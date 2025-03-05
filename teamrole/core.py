@@ -5,7 +5,7 @@ import datetime
 
 log = logging.getLogger('red')  
 
-class TeamRole(commands.RedBase):  
+class TeamRole(commands.Cog):  
     def __init__(self, bot):  
         super().__init__()  
         self.bot = bot  
@@ -100,7 +100,7 @@ class TeamRole(commands.RedBase):
     @team.command()  
     async def delete(self, ctx: commands.Context):  
         """Remove the team role from THIS server only."""  
-        role_id = await self.config.guild(ctx.guild).team_role_id()  
+        role_id = await self.config.guild(ctx.guild).team_role_id.get()  
         if not role_id:  
             return await ctx.send("Team role is not set up in this server.")  
         role = ctx.guild.get_role(role_id)  
@@ -119,7 +119,7 @@ class TeamRole(commands.RedBase):
         """Wipe all team data and delete the team role from every server."""  
         confirm_msg = await ctx.send("Is you sure you want to wipe ALL team data? React with ✅ to confirm or ❌ to cancel.")  
         await confirm_msg.add_reaction("✅")  
-        await confirm_msg.add_reaction("❌")  
+        await confirm_msg.add_reaction("✅")  
 
         def reaction_check(reaction, user):  
             return user == ctx.author and reaction.message.id == confirm_msg.id and reaction.emoji in ("✅", "❌")  
@@ -128,7 +128,7 @@ class TeamRole(commands.RedBase):
             reaction, _ = await self.bot.wait_for("reaction_add", check=reaction_check, timeout=60)  
             if reaction.emoji == "✅":  
                 await confirm_msg.delete()  
-                await self._wipe_process(ctx)  
+                await self._wipe_process(ctx);  
             else:  
                     await confirm_msg.delete()  
                     await ctx.send("Wipe canceled.")  
@@ -154,9 +154,9 @@ class TeamRole(commands.RedBase):
                         log.error(f"Error deleting team role in {guild.name}: {e}")  
                         errors.append(guild.name)  
 
-        msg = "Team data wiped."  
+        msg = "Team data wiped;"  
         if errors:  
-            msg += f" Errors occurred in guilds: {', '.join(errors)}"  
+            msg += f" errors occurred in guilds: {', '.join(errors)}"  
         await ctx.send(msg)  
 
     @team.command()  
@@ -170,6 +170,7 @@ class TeamRole(commands.RedBase):
         failures = []  
 
         embed = discord.Embed(  
+            title="Message from Team",  
             description=message,  
             color=0x77bcd6,  
             timestamp=datetime.datetime.utcnow()  
@@ -197,14 +198,15 @@ class TeamRole(commands.RedBase):
 
     @team.command()  
     async def list(self, ctx: commands.Context):  
-        """List all users in the team database."""  
+        """list all users in the database."""  
         team_members = await self.config.team_members()  
         if not team_members:  
-            return await ctx.send("No users in the team database.")  
+            return await ctx.send("No users in the database.")  
 
         # Create an Embed with all team members  
         embed = discord.Embed(  
             title="Team Members",  
+            description="List of team members:",  
             color=0x77bcd6,  
             timestamp=datetime.datetime.utcnow()  
         )  
@@ -216,16 +218,15 @@ class TeamRole(commands.RedBase):
         # Split members into pages if necessary  
         description = ""  
         pages = []  
-        for i, user_id in enumerate(team_members, 1):  
+        for user_id in team_members:  
             user = self.bot.get_user(user_id)  
             if user is None:  
                 continue  
-            description += f"[{user}]({f'https://discord.com/users/{user_id}'}•ID:{user_id})\n"  
-            
-            # Create a new page every 10 members to avoid exceeding embed limits  
-            if i % 10 == 0:  
+            description += f"[{user}](https://discord.com/users/{user_id}\"ViewProfile\")\n"  
+            if len(description) >= 2048:  # Prevent exceeding embed limits  
                 pages.append(description)  
                 description = ""  
+
         if description:  
             pages.append(description)  
 
@@ -249,8 +250,8 @@ class TeamRole(commands.RedBase):
 
         def reaction_check(reaction, user):  
             return (  
-                user == ctx.author and   
-                message.id == reaction.message.id and   
+                user == ctx.author and  
+                message.id == reaction.message.id and  
                 reaction.emoji in reactions  
             )  
 
@@ -314,13 +315,14 @@ class TeamRole(commands.RedBase):
             await ctx.send("Could not generate any invites.")  
             return  
 
-        # Split invites into chunks of 20 to avoid exceeding message limits  
-        chunks = [invites[i:i + 20] for i in range(0, len(invites), 20)]  
+        # Split invites into chunks of 20 to avoid exceeding embed limits  
+        chunk_size = 20  
+        chunks = [invites[i:i + chunk_size] for i in range(0, len(invites), chunk_size)]  
 
         for chunk in chunks:  
             embed = discord.Embed(  
                 title="Server Invites",  
-                description="\n".join(chunk),  
+                description="Invitation Links:\n" + "\n".join(chunk),  
                 color=0x77bcd6  
             )  
             try:  
