@@ -61,8 +61,26 @@ class TeamRole(commands.Cog):
                 # Move role to be just below the bot's top role.  
                 bot_member = guild.get_member(self.bot.user.id)  
                 if bot_member:  
-                    await role.edit(position=bot_member.top_role.position - 1)  
+                    # Ensure the bot has the necessary permissions to manage roles.  
+                    if not bot_member.guild_permissions.manage_roles:  
+                        log.error(f"Missing permissions to manage roles in {guild.name}")  
+                        raise discord.Forbidden("Bot lacks permissions to manage roles.")  
+
+                    # Get the bot's highest role in the guild.  
+                    bot_roles = [role for role in guild.roles if role in bot_member.roles]  
+                    if bot_roles:  
+                        highest_bot_role = max(bot_roles, key=lambda r: r.position)  
+                        # Position the team role just below the highest bot role.  
+                        new_position = highest_bot_role.position - 1  
+                        await role.edit(position=new_position)  
+                    else:  
+                        log.warning(f"Bot has no roles in {guild.name}")  
+                else:  
+                    log.error(f"Bot member not found in {guild.name}")  
             return role  
+        except discord.Forbidden:  
+            log.error(f"Forbidden error creating team role in {guild.name}")  
+            raise  
         except Exception as e:  
             log.error(f"Failed to create team role in {guild.name}: {e}", exc_info=True)  
             raise  
@@ -75,6 +93,8 @@ class TeamRole(commands.Cog):
             role = await self.create_team_role(ctx.guild)  
             await self.config.guild(ctx.guild).team_role_id.set(role.id)  
             await ctx.send(f"Team role created: {role.mention}")  
+        except discord.Forbidden:  
+            await ctx.send("I don't have permission to create roles in this server.")  
         except Exception as e:  
             await ctx.send("Failed to create team role.")  
             log.error(f"Error during team role creation in guild '{ctx.guild.name}': {e}", exc_info=True)  
@@ -84,7 +104,8 @@ class TeamRole(commands.Cog):
     async def team_update(self, ctx: commands.Context):  
         """  
         Iterate over all servers, ensuring the team role exists in each and  
-        gives every user in the global team database the team role.  
+        gives every user in the global team database the team role, and  
+        positions it under the bot's highest role.  
         """  
         team_members = await self.config.team_members()  
         errors = []  
@@ -109,6 +130,23 @@ class TeamRole(commands.Cog):
                         log.error(f"Role lookup/creation error in {guild.name}: {e}", exc_info=True)  
                         errors.append(guild.name)  
                         continue  
+
+            # Ensure the role is positioned under the bot's highest role.  
+            try:  
+                bot_member = guild.get_member(self.bot.user.id)  
+                if bot_member:  
+                    bot_roles = [r for r in guild.roles if r in bot_member.roles]  
+                    if bot_roles:  
+                        highest_bot_role = max(bot_roles, key=lambda r: r.position)  
+                        if role.position != highest_bot_role.position - 1:  
+                            await role.edit(position=highest_bot_role.position - 1)  
+                            log.info(f"Adjusted team role position in {guild.name}")  
+                    else:  
+                        log.warning(f"Bot has no roles in {guild.name}")  
+                else:  
+                    log.error(f"Bot member not found in {guild.name}")  
+            except Exception as e:  
+                log.error(f"Failed to adjust role position in {guild.name}: {e}")  
 
             # Add the role to each team member in this guild.  
             for user_id in team_members:  
@@ -175,4 +213,6 @@ class TeamRole(commands.Cog):
         msg = "Team data wiped."  
         if errors:  
             msg += f" Errors in guilds: {', '.join(errors)}"  
-        await ctx.send(msg)
+        await ctx.send(msg)  
+
+# End of Cog
