@@ -152,16 +152,4 @@ class TeamRole(commands.Cog):
                 if not role_id:
                     role = await create_team_role(guild, self.bot)
                     await self.config.guild(guild).team_role_id.set(role.id)
-                    role_id = role.id
-                role = guild.get_role(role_id)
-                if not role:
-                    role = await create_team_role(guild, self.bot)
-                    await self.config.guild(guild).team_role_id.set(role.id)
-                for member_id in team_members:
-                    member = guild.get_member(member_id)
-                    if member and role not in member.roles:
-                        await member.add_roles(role)
-                        log.info(f"Added 'KCN | Team' role to {member.name} in {guild.name}.")
-            except Exception as e:
-                log.error(f"Failed to update roles in {guild.name}: {e}")
-        await ctx.send("Updated the 'KCN | Team' role across all servers.")
+                    role_id = role
