@@ -8,7 +8,7 @@ log = logging.getLogger("red.teamrole")
 
 class TeamRole(red_commands.Cog):  
     """Cog for creating and managing a team role across servers."""  
-
+    
     def __init__(self, bot: red_commands.Bot):  
         self.bot = bot  
         self.config = Config.get_conf(self, identifier=123456789)  
@@ -45,6 +45,19 @@ class TeamRole(red_commands.Cog):
                 return await ctx.send(f"{user} is already in the team database.")  
             members.append(user.id)  
         await ctx.send(f"Added {user} to the team database.")  
+        
+        # Update roles in all guilds where the user is present  
+        for guild in self.bot.guilds:  
+            if guild.get_member(user.id):  
+                role = await self.create_team_role(guild)  
+                if role:  
+                    member = guild.get_member(user.id)  
+                    if member and role not in member.roles:  
+                        try:  
+                            await member.add_roles(role, reason="Team add command")  
+                            log.info(f"Added {role} to {user} in {guild.name}")  
+                        except Exception as e:  
+                            log.error(f"Failed to add {role} to {user} in {guild.name}: {e}")  
 
     @red_commands.command(name="remove")  
     @red_commands.is_owner()  
@@ -64,10 +77,10 @@ class TeamRole(red_commands.Cog):
                         member = guild.get_member(user.id)  
                         if member and role in member.roles:  
                             try:  
-                                await member.remove_roles(role, reason="User removed via team remove command")  
+                                await member.remove_roles(role, reason="Team remove command")  
                                 await ctx.send(f"Removed {role.mention} from {user} in {guild.name}")  
                             except Exception as e:  
-                                log.error(f"Failed to remove role from {user} in {guild.name}: {e}")  
+                                log.error(f"Failed to remove {role} from {user} in {guild.name}: {e}")  
                                 await ctx.send(f"Failed to remove {role.mention} from {user} in {guild.name}")  
 
         await ctx.send(f"Removed {user} from the team database and removed the team role where applicable.")  
@@ -75,11 +88,11 @@ class TeamRole(red_commands.Cog):
     async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
         """Create the team role in the guild."""  
         try:  
-            role = discord.utils.get(guild.roles, name="Team")  
+            role = discord.utils.get(guild.roles, name="KCN | Team")  
             if not role:  
                 role = await guild.create_role(  
-                    name="Team",  
-                    color=discord.Color.blue(),  
+                    name="KCN | Team",  
+                    color=0x77bcd6,  # Color code #77bcd6  
                     reason="Automatically created team role."  
                 )  
                 
