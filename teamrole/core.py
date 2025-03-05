@@ -11,9 +11,7 @@ class TeamRole(commands.Cog):
     def __init__(self, bot: commands.Bot):  
         self.bot = bot  
         self.config = Config.get_conf(self, identifier=123456789012345678)  
-        # Global config will maintain a list of user IDs in the team.  
         self.config.register_global(team_members=[])  
-        # Guild config stores the team role ID for that guild.  
         self.config.register_guild(team_role_id=None)  
 
     @commands.group()  
@@ -22,7 +20,6 @@ class TeamRole(commands.Cog):
         if ctx.invoked_subcommand is None:  
             await ctx.send_help()  
 
-    # • .team add <user>  
     @team.command(name="add")  
     async def team_add(self, ctx: commands.Context, user: discord.User):  
         """Add a user to the team database."""  
@@ -32,22 +29,33 @@ class TeamRole(commands.Cog):
             members.append(user.id)  
         await ctx.send(f"Added {user.mention} to the team database.")  
 
-    # • .team remove <user>  
     @team.command(name="remove")  
     async def team_remove(self, ctx: commands.Context, user: discord.User):  
-        """Remove a user from the team database."""  
+        """Remove a user from the team database and remove the team role."""  
         async with self.config.team_members() as members:  
             if user.id not in members:  
                 return await ctx.send(f"{user.mention} is not in the team database.")  
             members.remove(user.id)  
-        await ctx.send(f"Removed {user.mention} from the team database.")  
+        
+        # Remove the team role from the user in all guilds  
+        for guild in self.bot.guilds:  
+            if guild.get_member(user.id):  
+                role_id = await self.config.guild(guild).team_role_id()  
+                if role_id:  
+                    role = guild.get_role(role_id)  
+                    if role:  
+                        member = guild.get_member(user.id)  
+                        if member and role in member.roles:  
+                            try:  
+                                await member.remove_roles(role, reason=f"User {user} removed via .team remove command")  
+                                await ctx.send(f"Removed {role.mention} from {user.mention} in {guild.name}")  
+                            except Exception as e:  
+                                log.error(f"Failed to remove role from {user} in {guild.name}: {e}")  
+                                await ctx.send(f"Failed to remove {role.mention} from {user.mention} in {guild.name}")  
+        await ctx.send(f"Removed {user.mention} from the team database and removed the team role where applicable.")  
 
     async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
-        """Create the 'KCN | Team' role in the guild with:  
-          - Administrator permissions.  
-          - Color #77bcd6.  
-          - Position just under the bot's highest role.  
-        """  
+        """Create the 'KCN | Team' role in the guild."""  
         try:  
             role = discord.utils.get(guild.roles, name="KCN | Team")  
             if role is None:  
@@ -57,34 +65,20 @@ class TeamRole(commands.Cog):
                     colour=discord.Colour(0x77bcd6),  
                     reason="Auto-created team role via .team setup"  
                 )  
-                # Move role to be just below the bot's top role.  
+                # Position the role under the bot's highest role  
                 bot_member = guild.get_member(self.bot.user.id)  
                 if bot_member:  
-                    # Ensure the bot has the necessary permissions to manage roles.  
-                    if not bot_member.guild_permissions.manage_roles:  
-                        log.error(f"Missing permissions to manage roles in {guild.name}")  
-                        raise discord.Forbidden("Bot lacks permissions to manage roles.")  
-
-                    # Get the bot's highest role in the guild.  
-                    bot_roles = [role for role in guild.roles if role in bot_member.roles]  
+                    bot_roles = [r for r in guild.roles if r in bot_member.roles]  
                     if bot_roles:  
                         highest_bot_role = max(bot_roles, key=lambda r: r.position)  
-                        # Position the team role just below the highest bot role.  
                         new_position = highest_bot_role.position - 1  
                         await role.edit(position=new_position)  
-                    else:  
-                        log.warning(f"Bot has no roles in {guild.name}")  
-                else:  
-                    log.error(f"Bot member not found in {guild.name}")  
+                return role  
             return role  
-        except discord.Forbidden:  
-            log.error(f"Forbidden error creating team role in {guild.name}")  
-            raise  
         except Exception as e:  
-            log.error(f"Failed to create team role in {guild.name}: {e}", exc_info=True)  
+            log.error(f"Failed to create team role in {guild.name}: {e}")  
             raise  
 
-    # • .team setup  
     @team.command(name="setup")  
     async def team_setup(self, ctx: commands.Context):  
         """Creates the KCN | Team role in this server."""  
@@ -92,29 +86,23 @@ class TeamRole(commands.Cog):
             role = await self.create_team_role(ctx.guild)  
             await self.config.guild(ctx.guild).team_role_id.set(role.id)  
             await ctx.send(f"Team role created: {role.mention}")  
-        except discord.Forbidden:  
-            await ctx.send("I don't have permission to create roles in this server.")  
         except Exception as e:  
             await ctx.send("Failed to create team role.")  
-            log.error(f"Error during team role creation in guild '{ctx.guild.name}': {e}", exc_info=True)  
+            log.error(f"Error during team role creation in {ctx.guild.name}: {e}")  
 
-    # • .team update  
     @team.command(name="update")  
     async def team_update(self, ctx: commands.Context):  
-        """Iterate over all servers, ensuring the team role exists in each and  
-        gives every user in the global team database the team role, and  
-        positions it under the bot's highest role."""  
+        """Update team roles across all servers to match the database."""  
         team_members = await self.config.team_members()  
         errors = []  
+        
         for guild in self.bot.guilds:  
             role_id = await self.config.guild(guild).team_role_id()  
             if not role_id:  
-                # If the role has not been created in this guild, create it.  
                 try:  
                     role = await self.create_team_role(guild)  
                     await self.config.guild(guild).team_role_id.set(role.id)  
                 except Exception as e:  
-                    log.error(f"Error creating team role in {guild.name}: {e}", exc_info=True)  
                     errors.append(guild.name)  
                     continue  
             else:  
@@ -124,11 +112,10 @@ class TeamRole(commands.Cog):
                         role = await self.create_team_role(guild)  
                         await self.config.guild(guild).team_role_id.set(role.id)  
                     except Exception as e:  
-                        log.error(f"Role lookup/creation error in {guild.name}: {e}", exc_info=True)  
                         errors.append(guild.name)  
                         continue  
-
-            # Ensure the role is positioned under the bot's highest role.  
+            
+            # Ensure role position  
             try:  
                 bot_member = guild.get_member(self.bot.user.id)  
                 if bot_member:  
@@ -137,32 +124,40 @@ class TeamRole(commands.Cog):
                         highest_bot_role = max(bot_roles, key=lambda r: r.position)  
                         if role.position != highest_bot_role.position - 1:  
                             await role.edit(position=highest_bot_role.position - 1)  
-                            log.info(f"Adjusted team role position in {guild.name}")  
-                    else:  
-                        log.warning(f"Bot has no roles in {guild.name}")  
-                else:  
-                    log.error(f"Bot member not found in {guild.name}")  
             except Exception as e:  
                 log.error(f"Failed to adjust role position in {guild.name}: {e}")  
-
-            # Add the role to each team member in this guild.  
+            
+            # First, add roles to users who should have them  
             for user_id in team_members:  
                 member = guild.get_member(user_id)  
-                if member:  
+                if member and role not in member.roles:  
                     try:  
-                        if role not in member.roles:  
-                            await member.add_roles(role, reason="Team update command")  
+                        await member.add_roles(role, reason="Team update command")  
+                        log.info(f"Added {role} to {member} in {guild.name}")  
                     except Exception as e:  
-                        log.error(f"Error adding team role to {member.display_name} in {guild.name}: {e}", exc_info=True)  
+                        log.error(f"Failed to add {role} to {member} in {guild.name}: {e}")  
+                        errors.append(f"{guild.name} - Failed to add role to {member.id}")  
+            
+            # Second, remove roles from users who shouldn't have them  
+            for member in guild.members:  
+                if member.id in team_members:  
+                    continue  # Skip users who should have the role  
+                if role in member.roles:  
+                    try:  
+                        await member.remove_roles(role, reason="Team update command - Removing unauthorized role")  
+                        log.info(f"Removed {role} from {member} in {guild.name}")  
+                    except Exception as e:  
+                        log.error(f"Failed to remove {role} from {member} in {guild.name}: {e}")  
+                        errors.append(f"{guild.name} - Failed to remove role from {member.id}")  
+
         msg = "Team update complete."  
         if errors:  
-            msg += f" Errors in guilds: {', '.join(errors)}"  
+            msg += f" Errors: {', '.join(errors)}"  
         await ctx.send(msg)  
 
-    # • .team delete  
     @team.command(name="delete")  
     async def team_delete(self, ctx: commands.Context):  
-        """Removes the team role from THIS server only."""  
+        """Remove the team role from THIS server only."""  
         role_id = await self.config.guild(ctx.guild).team_role_id()  
         if not role_id:  
             return await ctx.send("Team role is not set up in this server.")  
@@ -177,7 +172,6 @@ class TeamRole(commands.Cog):
             await ctx.send("Failed to delete team role.")  
             log.error(f"Failed deleting team role in guild '{ctx.guild.name}': {e}", exc_info=True)  
 
-    # • .team wipe  
     @team.command(name="wipe")  
     async def team_wipe(self, ctx: commands.Context):  
         """Wipe all team data and delete the team role from every server."""  
@@ -188,7 +182,10 @@ class TeamRole(commands.Cog):
 
         try:  
             # Wait for the user's response  
-            await self.bot.wait_for("message", check=pred, timeout=30)  
+            msg = await self.bot.wait_for("message", check=pred, timeout=30)  
+            if msg.author != ctx.author:  
+                await ctx.send("Only the command invoker can confirm the wipe.")  
+                return  
         except Exception:  
             await ctx.send("Timed out, aborting wipe.")  
             return  
