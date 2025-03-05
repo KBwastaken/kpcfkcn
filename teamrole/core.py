@@ -12,11 +12,23 @@ class TeamRole(red_commands.Cog):
     def __init__(self, bot: red_commands.Bot):  
         self.bot = bot  
         self.config = Config.get_conf(self, identifier=123456789)  
-        self.config.register_global(team_members=[]).register_guild(team_role_id=None)  
         
+        # Register global configuration  
+        self.config.register_global(  
+            team_members=[]  
+        )  
+        
+        # Register guild-specific configuration  
+        self.config.register_guild(  
+            team_role_id=None  
+        )  
+        
+        # Initialize the configuration  
+        self.config.init()  
+
     async def setup(self):  
         """Setup for the Cog."""  
-        await self.config.init()  
+        pass  # This is called when the cog is loaded; no additional setup needed here  
 
     @red_commands.group()  
     async def team(self, ctx: red_commands.Context):  
