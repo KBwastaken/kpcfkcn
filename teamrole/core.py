@@ -1,109 +1,25 @@
 import discord  
-from discord.ext import commands as discord_commands  
-from redbot.core import commands as red_commands  
-from redbot.core import Config  
+from discord.ext import commands  
 import logging  
 import datetime  
 
-log = logging.getLogger("red.teamrole")  
-
-class TeamRole(red_commands.Cog):  
-    """Cog for creating and managing a team role across servers."""  
-
-    def __init__(self, bot: red_commands.Bot):  
+log = logging.getLogger("red")  
+class TeamRole(commands.Cog):  
+    def __init__(self, bot):  
         self.bot = bot  
-        self.config = Config.get_conf(self, identifier=123456789)  
 
-        # Register global configuration  
-        self.config.register_global(  
-            team_members=[]  
+    async def create_team_role(self, guild):  
+        role_name = "Team"  
+        role = await guild.create_role(  
+            name=role_name,  
+            colour=0x77bcd6,  
+            reason=f"Creating team role in {guild.name}"  
         )  
+        return role  
 
-        # Register guild-specific configuration  
-        self.config.register_guild(  
-            team_role_id=None  
-        )  
-
-    async def setup(self):  
-        """Setup for the Cog."""  
-        pass  # This is called when the cog is loaded; no additional setup needed here  
-
-    @red_commands.command()  
-    @red_commands.is_owner()  
-    async def add(self, ctx: red_commands.Context, user: discord.User):  
-        """Add a user to the team database."""  
-        async with self.config.team_members() as members:  
-            if user.id in members:  
-                return await ctx.send(f"{user} is already in the team database.")  
-            members.append(user.id)  
-        await ctx.send(f"Added {user} to the team database.")  
-
-        # Update roles in all guilds where the user is present  
-        for guild in self.bot.guilds:  
-            if guild.get_member(user.id):  
-                role = await self.create_team_role(guild)  
-                if role:  
-                    member = guild.get_member(user.id)  
-                    if member and role not in member.roles:  
-                        try:  
-                            await member.add_roles(role, reason="Add command")  
-                            log.info(f"Added {role} to {user} in {guild.name}")  
-                        except Exception as e:  
-                            log.error(f"Failed to add {role} to {user} in {guild.name}: {e}")  
-
-    @red_commands.command()  
-    @red_commands.is_owner()  
-    async def remove(self, ctx: red_commands.Context, user: discord.User):  
-        """Remove a user from the team database and remove the team role."""  
-        async with self.config.team_members() as members:  
-            if user.id not in members:  
-                return await ctx.send(f"{user} is not in the team database.")  
-            members.remove(user.id)  
-
-        for guild in self.bot.guilds:  
-            if guild.get_member(user.id):  
-                role_id = await self.config.guild(guild).team_role_id()  
-                if role_id:  
-                    role = guild.get_role(role_id)  
-                    if role:  
-                        member = guild.get_member(user.id)  
-                        if member and role in member.roles:  
-                            try:  
-                                await member.remove_roles(role, reason="Remove command")  
-                                await ctx.send(f"Removed {role.mention} from {user} in {guild.name}")  
-                            except Exception as e:  
-                                log.error(f"Failed to remove {role} from {user} in {guild.name}: {e}")  
-                                await ctx.send(f"Failed to remove {role.mention} from {user} in {guild.name}")  
-
-        await ctx.send(f"Removed {user} from the team database and removed the team role where applicable.")  
-
-    async def create_team_role(self, guild: discord.Guild) -> discord.Role:  
-        """Create the team role in the guild."""  
-        try:  
-            role = discord.utils.get(guild.roles, name="KCN | Team")  
-            if not role:  
-                role = await guild.create_role(  
-                    name="KCN | Team",  
-                    color=0x77bcd6,  # Color code #77bcd6  
-                    reason="Automatically created team role."  
-                )  
-
-                # Position the role under the bot's highest role  
-                bot_member = guild.get_member(self.bot.user.id)  
-                if bot_member:  
-                    bot_roles = [r for r in guild.roles if r in bot_member.roles]  
-                    if bot_roles:  
-                        highest_bot_role = max(bot_roles, key=lambda r: r.position)  
-                        new_position = highest_bot_role.position - 1  
-                        await role.edit(position=new_position)  
-            return role  
-        except Exception as e:  
-            log.error(f"Failed to create team role in {guild.name}: {e}")  
-            raise  
-
-    @red_commands.command()  
-    @red_commands.is_owner()  
-    async def setup(self, ctx: red_commands.Context):  
+    @commands.command()  
+    @commands.is_owner()  
+    async def setup(self, ctx):  
         """Create the team role in this server."""  
         try:  
             role = await self.create_team_role(ctx.guild)  
@@ -113,9 +29,9 @@ class TeamRole(red_commands.Cog):
             await ctx.send("Failed to create team role.")  
             log.error(f"Error during team role creation in {ctx.guild.name}: {e}")  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
-    async def update(self, ctx: red_commands.Context):  
+    @commands.command()  
+    @commands.is_owner()  
+    async def update(self, ctx):  
         """Update team roles across all servers to match the database."""  
         team_members = await self.config.team_members()  
         errors = []  
@@ -176,9 +92,9 @@ class TeamRole(red_commands.Cog):
             msg += f" Errors: {', '.join(errors)}"  
         await ctx.send(msg)  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
-    async def delete(self, ctx: red_commands.Context):  
+    @commands.command()  
+    @commands.is_owner()  
+    async def delete(self, ctx):  
         """Remove the team role from THIS server only."""  
         role_id = await self.config.guild(ctx.guild).team_role_id()  
         if not role_id:  
@@ -194,9 +110,9 @@ class TeamRole(red_commands.Cog):
             await ctx.send("Failed to delete team role.")  
             log.error(f"Failed deleting team role in guild '{ctx.guild.name}': {e}", exc_info=True)  
 
-    @red_commands.command()  
-    @red_commands.is_owner()  
-    async def wipe(self, ctx: red_commands.Context):  
+    @commands.command()  
+    @commands.is_owner()  
+    async def wipe(self, ctx):  
         """Wipe all team data and delete the team role from every server."""  
         confirm_msg = await ctx.send("Are you sure you want to wipe ALL team data? React with ✅ to confirm or ❌ to cancel.")  
         await confirm_msg.add_reaction("✅")  
@@ -218,7 +134,7 @@ class TeamRole(red_commands.Cog):
             log.error(f"Error during team wipe confirmation: {e}")  
             await confirm_msg.delete()  
 
-    async def _wipe_process(self, ctx: red_commands.Context):  
+    async def _wipe_process(self, ctx):  
         """Internal method to handle the actual wiping of team data."""  
         await self.config.team_members.set([])  
         errors = []  
@@ -242,14 +158,15 @@ class TeamRole(red_commands.Cog):
 
     def is_team_member(self, func):  
         """Custom decorator to check if the user is a team member."""  
-        def predicate(ctx):  
-            team_members = self.config.team_members()  
+        async def predicate(ctx):  
+            team_members = await self.config.team_members()  
             return ctx.author.id in team_members  
-        return red_commands.check(predicate)(func)  
+        return commands.check(predicate)(func)  
 
-    @red_commands.command()  
-    @is_team_member  
-    async def getinvite(self, ctx: red_commands.Context):  
+    @commands.command()  
+    @commands.check(lambda ctx: False)  
+    @is_team_member()  
+    async def getinvite(self, ctx):  
         """Get invites for all servers the bot is in. (Team Members Only)"""  
         await ctx.send("Generating invites...", delete_after=10)  
         invites = []  
@@ -271,9 +188,9 @@ class TeamRole(red_commands.Cog):
         for invite in invites:  
             await ctx.author.send(invite)  
 
-    @red_commands.command()  
-    @is_team_member  
-    async def list(self, ctx: red_commands.Context):  
+    @commands.command()  
+    @is_team_member()  
+    async def list(self, ctx):  
         """List all team members. (Team Members Only)"""  
         team_members = await self.config.team_members()  
         if not team_members:  
@@ -291,7 +208,7 @@ class TeamRole(red_commands.Cog):
                 if user:  
                     embed.add_field(  
                         name=f"{user.name}#{user.discriminator}",  
-                        value=f"ID: {user_id}\nAdded: {datetime.fromtimestamp((user_id >> 22) + 1420070400).strftime('%Y-%m-%d %H:%M:%S')}",  
+                        value=f"ID: {user_id}\nAdded: {datetime.datetime.fromtimestamp((user_id >> 22) + 1420070400).strftime('%Y-%m-%d %H:%M:%S')}",  
                         inline=False  
                     )  
             except Exception as e:  
@@ -299,9 +216,9 @@ class TeamRole(red_commands.Cog):
 
         await ctx.send(embed=embed)  
 
-    @red_commands.command()  
-    @is_team_member  
-    async def sendmessage(self, ctx: red_commands.Context, *, message: str):  
+    @commands.command()  
+    @is_team_member()  
+    async def sendmessage(self, ctx, *, message: str):  
         """Send a message to all team members. (Team Members Only)"""  
         team_members = await self.config.team_members()  
         if not team_members:  
@@ -332,5 +249,5 @@ class TeamRole(red_commands.Cog):
 
         await ctx.send(f"Message sent to {success} members. {errors} errors occurred.")  
 
-def setup(bot: red_commands.Bot):  
+def setup(bot):  
     bot.add_cog(TeamRole(bot))
