@@ -1,8 +1,8 @@
 import discord
 import logging
+from discord import Embed
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate
-from redbot.core.utils.embed import Embed
 from redbot.core.utils.menus import menu, DEFAULT_CONTROLS
 
 from .utils import create_team_role
