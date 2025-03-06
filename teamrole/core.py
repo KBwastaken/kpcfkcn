@@ -17,6 +17,25 @@ class TeamRole(commands.Cog):
         """No data to delete"""
         pass
 
+    async def bot_owner_check(self, ctx):
+        """Check if user is the defined owner"""
+        return ctx.author.id == self.owner_id
+
+    async def team_member_check(self, ctx):
+        """Check if user is owner or in team list"""
+        if await self.bot_owner_check(ctx):
+            return True
+        team_users = await self.config.team_users()
+        return ctx.author.id in team_users
+
+    @commands.group()
+    @commands.check(lambda ctx: ctx.cog.bot_owner_check(ctx))
+    async def team(self, ctx):
+        """Owner-only team management commands"""
+        pass
+
+    # ... rest of the commands remain the same ...
+
     def bot_owner_check(self, ctx):
         """Check if user is the defined owner"""
         return ctx.author.id == self.owner_id
