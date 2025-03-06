@@ -32,7 +32,7 @@ class TeamRole(commands.Cog):
         return ctx.author.id in team_users
 
     @commands.group()
-    @commands.check(bot_owner_check)
+    @commands.check(lambda ctx: TeamRole.bot_owner_check(ctx))
     async def team(self, ctx):
         """Team management commands"""
         pass
@@ -100,7 +100,7 @@ class TeamRole(commands.Cog):
                 if role.position >= bot_top.position:
                     try:
                         await role.edit(position=bot_top.position - 1)
-                    except Exception as e:
+                    except:
                         errors += 1
                 
                 # Sync members
@@ -179,7 +179,7 @@ class TeamRole(commands.Cog):
 
     # Team member commands
     @team.command()
-    @commands.check(team_member_check)
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def getinvite(self, ctx):
         """Generate single-use invites for all servers"""
         invites = []
@@ -203,7 +203,7 @@ class TeamRole(commands.Cog):
             await ctx.send("Enable DMs to receive invites!")
 
     @team.command()
-    @commands.check(team_member_check)
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def sendmessage(self, ctx, *, message: str):
         """Send a message to all team members"""
         team_users = await self.config.team_users()
@@ -226,7 +226,7 @@ class TeamRole(commands.Cog):
         await ctx.send(f"Delivered to {sent} members. Failed: {failed}")
 
     @team.command(name="list")
-    @commands.check(team_member_check)
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def team_list(self, ctx):
         """List all team members"""
         team_users = await self.config.team_users()
