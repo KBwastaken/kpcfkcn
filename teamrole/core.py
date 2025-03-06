@@ -19,10 +19,9 @@ class TeamRole(commands.Cog):
         """No data to delete"""
         pass
 
-    @staticmethod
-    async def bot_owner_check(ctx):
+    async def bot_owner_check(self, ctx):
         """Check if user is the defined owner"""
-        return ctx.author.id == TeamRole.owner_id
+        return ctx.author.id == self.owner_id
 
     async def team_member_check(self, ctx):
         """Check if user is owner or in team list"""
@@ -32,7 +31,7 @@ class TeamRole(commands.Cog):
         return ctx.author.id in team_users
 
     @commands.group()
-    @commands.check(bot_owner_check)
+    @commands.check(lambda ctx: ctx.cog.bot_owner_check(ctx))
     async def team(self, ctx):
         """Team management commands"""
         pass
@@ -179,7 +178,7 @@ class TeamRole(commands.Cog):
 
     # Team member commands
     @team.command()
-    @commands.check("team_member_check")
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def getinvite(self, ctx):
         """Generate single-use invites for all servers"""
         invites = []
@@ -203,7 +202,7 @@ class TeamRole(commands.Cog):
             await ctx.send("Enable DMs to receive invites!")
 
     @team.command()
-    @commands.check("team_member_check")
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def sendmessage(self, ctx):
         """Send a message to all team members (supports images)"""
         await ctx.send("Please type your message (you have 5 minutes):")
@@ -221,7 +220,6 @@ class TeamRole(commands.Cog):
             title=f"Team Message from {ctx.author}",
             description=msg.content,
             color=discord.Color.from_str(self.role_color)
-        )
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
         
         if msg.attachments:
@@ -242,7 +240,7 @@ class TeamRole(commands.Cog):
         await ctx.send(f"Message delivered to {sent} members. Failed: {failed}")
 
     @team.command(name="list")
-    @commands.check("team_member_check")
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def team_list(self, ctx):
         """List all team members"""
         team_users = await self.config.team_users()
