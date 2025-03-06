@@ -68,7 +68,7 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("User not in team list")
 
-        @team.command()
+    @team.command()
     async def update(self, ctx):
         """Update team roles across all servers"""
         team_users = await self.config.team_users()
@@ -84,7 +84,7 @@ class TeamRole(commands.Cog):
                     errors += 1
                     continue
                 
-                # Role positioning with proper handling
+                # Role positioning
                 bot_top_role = guild.me.top_role
                 try:
                     desired_position = bot_top_role.position - 1
@@ -99,12 +99,11 @@ class TeamRole(commands.Cog):
                     errors += 1
                     continue
                 
-                # Remove users not in list
+                # Sync members
                 to_remove = [m for m in role.members if m.id not in team_users]
                 for member in to_remove:
                     await member.remove_roles(role)
                 
-                # Add missing users
                 added = 0
                 for user_id in team_users:
                     member = guild.get_member(user_id)
