@@ -312,7 +312,7 @@ class TeamRole(red_commands.Cog):
 
     @red_commands.command()  
     @red_commands.check('_is_team_member')  
-    async def list(self, ctx: red_commands.Context):  
+    async def teamlist(self, ctx: red_commands.Context):  
         """List all team members."""  
         team_members = await self.config.team_members()  
         members = []  
@@ -326,7 +326,4 @@ class TeamRole(red_commands.Cog):
         if members:  
             await ctx.send("Team Members:\n" + "\n".join(members))  
         else:  
-            await ctx.send("No team members found.")  
-
-def setup(bot: red_commands.Bot):  
-    bot.add_cog(TeamRole(bot))
+            await ctx.send("No team members found.")
