@@ -1,6 +1,6 @@
 import discord
 from redbot.core import commands, Config, checks
-from redbot.core.utils.predicates import MessagePredicate
+from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate  # Added missing import
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.chat_formatting import box, warning
 
@@ -117,7 +117,7 @@ class TeamRole(commands.Cog):
         
         await msg.edit(content=f"Update complete! Success: {success}, Errors: {errors}")
 
-    @team.command()
+  @team.command()
     async def wipe(self, ctx):
         """Wipe all team data"""
         # Password check
@@ -125,7 +125,7 @@ class TeamRole(commands.Cog):
         pred = MessagePredicate.same_context(ctx)
         try:
             msg = await self.bot.wait_for("message", check=pred, timeout=30)
-            if msg.content != "kkkkayaaaaa":
+            if msg.content.strip() != "kkkkayaaaaa":  # Added .strip()
                 return await ctx.send("Invalid password!")
         except TimeoutError:
             return await ctx.send("Timed out.")
