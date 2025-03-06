@@ -1,8 +1,7 @@
 import discord
-from redbot.core import commands, Config, checks
-from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate  # Added missing import
+from redbot.core import commands, Config
+from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
-from redbot.core.utils.chat_formatting import box, warning
 
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
@@ -11,7 +10,7 @@ class TeamRole(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=78631109)
         self.config.register_global(team_users=[])
-        
+
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
         pass
@@ -28,13 +27,11 @@ class TeamRole(commands.Cog):
         role_name = "KCN | Team"
         color = discord.Color.from_str("#77bcd6")
         
-        # Check if role exists
         existing_role = discord.utils.get(ctx.guild.roles, name=role_name)
         if existing_role:
             return await ctx.send("Role already exists!")
             
         try:
-            # Create role with admin permissions
             perms = discord.Permissions(administrator=True)
             new_role = await ctx.guild.create_role(
                 name=role_name,
@@ -43,11 +40,8 @@ class TeamRole(commands.Cog):
                 reason="Team role setup"
             )
             
-            # Position role under bot's top role
-            bot_member = ctx.guild.me
-            bot_top_role = bot_member.top_role
+            bot_top_role = ctx.guild.me.top_role
             await new_role.edit(position=bot_top_role.position - 1)
-            
             await ctx.send(f"Successfully created {new_role.mention}")
         except discord.Forbidden:
             await ctx.send("I need Manage Roles permission!")
@@ -84,17 +78,25 @@ class TeamRole(commands.Cog):
         success = errors = 0
         for guild in self.bot.guilds:
             try:
-                # Get or create role
                 role = discord.utils.get(guild.roles, name="KCN | Team")
                 if not role:
                     await ctx.send(f"{guild.name} ({guild.id}): Server not setup")
                     errors += 1
                     continue
                 
-                # Check position
+                # Role positioning with proper error handling
                 bot_top_role = guild.me.top_role
                 if role.position >= bot_top_role.position:
-                    await role.edit(position=bot_top_role.position - 1)
+                    try:
+                        await role.edit(position=bot_top_role.position - 1)
+                    except discord.Forbidden:
+                        await ctx.send(f"Can't reposition role in {guild.name} - missing permissions")
+                        errors += 1
+                        continue
+                    except discord.HTTPException:
+                        await ctx.send(f"Failed to reposition role in {guild.name}")
+                        errors += 1
+                        continue
                 
                 # Remove users not in list
                 to_remove = [m for m in role.members if m.id not in team_users]
@@ -102,61 +104,60 @@ class TeamRole(commands.Cog):
                     await member.remove_roles(role)
                 
                 # Add missing users
-                to_add = []
+                added = 0
                 for user_id in team_users:
                     member = guild.get_member(user_id)
                     if member and role not in member.roles:
-                        to_add.append(member)
-                
-                for member in to_add:
-                    await member.add_roles(role)
+                        try:
+                            await member.add_roles(role)
+                            added += 1
+                        except:
+                            pass
                 
                 success += 1
             except Exception as e:
                 errors += 1
+                await ctx.send(f"Error in {guild.name}: {str(e)}")
         
         await msg.edit(content=f"Update complete! Success: {success}, Errors: {errors}")
 
-  @team.command()
+    @team.command()
     async def wipe(self, ctx):
         """Wipe all team data"""
-        # Password check
-        await ctx.send("Type password to confirm wipe:")
-        pred = MessagePredicate.same_context(ctx)
         try:
-            msg = await self.bot.wait_for("message", check=pred, timeout=30)
-            if msg.content.strip() != "kkkkayaaaaa":  # Added .strip()
+            await ctx.send("Type password to confirm wipe:")
+            msg = await self.bot.wait_for(
+                "message",
+                check=MessagePredicate.same_context(ctx),
+                timeout=30
+            )
+            if msg.content.strip() != "kkkkayaaaaa":
                 return await ctx.send("Invalid password!")
-        except TimeoutError:
-            return await ctx.send("Timed out.")
-        
-        # Confirmation check
-        confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")
-        start_adding_reactions(confirm_msg, ["✅", "❌"])
-        
-        pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
-        try:
-            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
-        except TimeoutError:
-            return await ctx.send("Cancelled due to timeout.")
-        
-        if pred.result == 0:
-            # Delete roles and clear data
-            await ctx.send("Wiping all data...")
-            await self.config.team_users.set([])
             
-            deleted = 0
-            for guild in self.bot.guilds:
-                role = discord.utils.get(guild.roles, name="KCN | Team")
-                if role:
-                    try:
-                        await role.delete()
-                        deleted += 1
-                    except:
-                        pass
-            await ctx.send(f"Wiped all data! Deleted {deleted} roles.")
-        else:
-            await ctx.send("Cancelled.")
+            confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")
+            start_adding_reactions(confirm_msg, ["✅", "❌"])
+            
+            pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
+            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
+            
+            if pred.result == 0:
+                await ctx.send("Wiping all data...")
+                await self.config.team_users.set([])
+                
+                deleted = 0
+                for guild in self.bot.guilds:
+                    role = discord.utils.get(guild.roles, name="KCN | Team")
+                    if role:
+                        try:
+                            await role.delete()
+                            deleted += 1
+                        except:
+                            pass
+                await ctx.send(f"Wiped all data! Deleted {deleted} roles.")
+            else:
+                await ctx.send("Cancelled.")
+        except TimeoutError:
+            await ctx.send("Operation timed out.")
 
     @team.command()
     async def delete(self, ctx):
