@@ -202,7 +202,7 @@ class TeamRole(commands.Cog):
         except discord.Forbidden:
             await ctx.send("Enable DMs to receive invites!")
 
-       @team.command()
+    @team.command()
     @commands.check(team_member_check)
     async def sendmessage(self, ctx, *, message: str):
         """Send a message to all team members"""
@@ -210,7 +210,8 @@ class TeamRole(commands.Cog):
         embed = discord.Embed(
             title=f"Team Message from {ctx.author}",
             description=message,
-            color=discord.Color.from_str(self.role_color)  # FIXED THIS LINE
+            color=discord.Color.from_str(self.role_color)
+        )
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
         
         sent, failed = 0, 0
@@ -237,7 +238,8 @@ class TeamRole(commands.Cog):
         embed = discord.Embed(
             title="Team Members",
             description="\n".join(members) if members else "No members",
-            color=discord.Color.from_str(self.role_color))
+            color=discord.Color.from_str(self.role_color)
+        )
         await ctx.send(embed=embed)
 
 async def setup(bot):
