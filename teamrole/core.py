@@ -202,19 +202,39 @@ class TeamRole(commands.Cog):
         except discord.Forbidden:
             await ctx.send("Enable DMs to receive invites!")
 
-    @team.command()
+       @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
-    async def sendmessage(self, ctx, *, message: str):
-        """Send a message to all team members"""
-        team_users = await self.config.team_users()
+    async def sendmessage(self, ctx):
+        """Send a message to all team members (supports images)"""
+        # Prompt for message
+        await ctx.send("Please type your message (you have 5 minutes):")
+        
+        try:
+            msg = await self.bot.wait_for(
+                "message",
+                check=lambda m: m.author == ctx.author,
+                timeout=300
+            )
+        except TimeoutError:
+            return await ctx.send("Timed out waiting for message.")
+            
+        # Create embed
         embed = discord.Embed(
             title=f"Team Message from {ctx.author}",
-            description=message,
+            description=msg.content,
             color=discord.Color.from_str(self.role_color)
-        )
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
         
+        # Add author with avatar
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        
+        # Add image if attached
+        if msg.attachments:
+            embed.set_image(url=msg.attachments[0].url)
+        
+        # Send to team members
+        team_users = await self.config.team_users()
         sent, failed = 0, 0
+        
         for uid in team_users:
             user = self.bot.get_user(uid)
             if user:
@@ -223,7 +243,8 @@ class TeamRole(commands.Cog):
                     sent += 1
                 except:
                     failed += 1
-        await ctx.send(f"Delivered to {sent} members. Failed: {failed}")
+        
+        await ctx.send(f"Message delivered to {sent} members. Failed: {failed}")
 
     @team.command(name="list")
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
