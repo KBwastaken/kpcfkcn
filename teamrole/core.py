@@ -32,7 +32,7 @@ class TeamRole(commands.Cog):
         return ctx.author.id in team_users
 
     @commands.group()
-    @commands.check(lambda ctx: TeamRole.bot_owner_check(ctx))
+    @commands.check(bot_owner_check)
     async def team(self, ctx):
         """Team management commands"""
         pass
@@ -179,7 +179,7 @@ class TeamRole(commands.Cog):
 
     # Team member commands
     @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    @commands.check("team_member_check")
     async def getinvite(self, ctx):
         """Generate single-use invites for all servers"""
         invites = []
@@ -203,7 +203,7 @@ class TeamRole(commands.Cog):
             await ctx.send("Enable DMs to receive invites!")
 
     @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    @commands.check("team_member_check")
     async def sendmessage(self, ctx):
         """Send a message to all team members (supports images)"""
         await ctx.send("Please type your message (you have 5 minutes):")
@@ -242,7 +242,7 @@ class TeamRole(commands.Cog):
         await ctx.send(f"Message delivered to {sent} members. Failed: {failed}")
 
     @team.command(name="list")
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    @commands.check("team_member_check")
     async def team_list(self, ctx):
         """List all team members"""
         team_users = await self.config.team_users()
