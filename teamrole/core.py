@@ -7,42 +7,27 @@ from redbot.core.utils.chat_formatting import humanize_list
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
     
+    owner_id = 1174820638997872721  # Your owner ID
+    role_name = "KCN | Team"
+    role_color = "#77bcd6"
+
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=78631109)
         self.config.register_global(team_users=[])
-        self.owner_id = 1174820638997872721  # Your owner ID
 
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
         pass
 
-    async def bot_owner_check(self, ctx):
-        """Check if user is the defined owner"""
-        return ctx.author.id == self.owner_id
+    @classmethod
+    async def bot_owner_check(cls, ctx):
+        """Static owner check"""
+        return ctx.author.id == cls.owner_id
 
     async def team_member_check(self, ctx):
         """Check if user is owner or in team list"""
         if await self.bot_owner_check(ctx):
-            return True
-        team_users = await self.config.team_users()
-        return ctx.author.id in team_users
-
-    @commands.group()
-    @commands.check(lambda ctx: ctx.cog.bot_owner_check(ctx))
-    async def team(self, ctx):
-        """Owner-only team management commands"""
-        pass
-
-    # ... rest of the commands remain the same ...
-
-    def bot_owner_check(self, ctx):
-        """Check if user is the defined owner"""
-        return ctx.author.id == self.owner_id
-
-    async def team_member_check(self, ctx):
-        """Check if user is owner or in team list"""
-        if self.bot_owner_check(ctx):
             return True
         team_users = await self.config.team_users()
         return ctx.author.id in team_users
@@ -53,22 +38,18 @@ class TeamRole(commands.Cog):
         """Owner-only team management commands"""
         pass
 
-    # Owner-only commands
     @team.command()
     async def setup(self, ctx):
         """Create team role in this server"""
-        role_name = "KCN | Team"
-        color = discord.Color.from_str("#77bcd6")
-        
-        existing_role = discord.utils.get(ctx.guild.roles, name=role_name)
+        existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
         if existing_role:
             return await ctx.send("Role already exists!")
             
         try:
             perms = discord.Permissions(administrator=True)
             new_role = await ctx.guild.create_role(
-                name=role_name,
-                color=color,
+                name=self.role_name,
+                color=discord.Color.from_str(self.role_color),
                 permissions=perms,
                 reason="Team role setup"
             )
@@ -111,7 +92,7 @@ class TeamRole(commands.Cog):
         success = errors = 0
         for guild in self.bot.guilds:
             try:
-                role = discord.utils.get(guild.roles, name="KCN | Team")
+                role = discord.utils.get(guild.roles, name=self.role_name)
                 if not role:
                     await ctx.send(f"{guild.name} ({guild.id}): Server not setup")
                     errors += 1
@@ -179,7 +160,7 @@ class TeamRole(commands.Cog):
                 
                 deleted = 0
                 for guild in self.bot.guilds:
-                    role = discord.utils.get(guild.roles, name="KCN | Team")
+                    role = discord.utils.get(guild.roles, name=self.role_name)
                     if role:
                         try:
                             await role.delete()
@@ -195,7 +176,7 @@ class TeamRole(commands.Cog):
     @team.command()
     async def delete(self, ctx):
         """Delete team role in this server"""
-        role = discord.utils.get(ctx.guild.roles, name="KCN | Team")
+        role = discord.utils.get(ctx.guild.roles, name=self.role_name)
         if role:
             try:
                 await role.delete()
@@ -207,7 +188,6 @@ class TeamRole(commands.Cog):
         else:
             await ctx.send("No team role exists here!")
 
-    # Team member commands
     @commands.command()
     @commands.check(team_member_check)
     async def getinvite(self, ctx):
