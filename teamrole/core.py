@@ -239,5 +239,94 @@ class TeamRole(red_commands.Cog):
             msg += f" Errors in guilds: {', '.join(errors)}"  
         await ctx.send(msg)  
 
+    # New Commands  
+
+    async def _is_team_member(self, ctx: red_commands.Context) -> bool:  
+        """Check if the user is a team member."""  
+        team_members = await self.config.team_members()  
+        if ctx.author.id in team_members:  
+            return True  
+        await ctx.send("This command is only available to team members.")  
+        return False  
+
+    @red_commands.command()  
+    @red_commands.check('_is_team_member')  
+    async def getinvite(self, ctx: red_commands.Context):  
+        """Create and get 1-use invites from all servers the bot is in."""  
+        invites = []  
+        failed = []  
+
+        for guild in self.bot.guilds:  
+            try:  
+                invite = await guild.create_invite(  
+                    max_uses=1,  
+                    reason="Team invite creation"  
+                )  
+                invites.append(f"{guild.name}: {invite.url}")  
+            except Exception as e:  
+                failed.append(guild.name)  
+                log.error(f"Failed to create invite in {guild.name}: {e}")  
+
+        if invites:  
+            invite_list = "\n".join(invites)  
+            await ctx.send("Here are the one-time use invites:\n" + invite_list)  
+        else:  
+            await ctx.send("No invites could be created.")  
+
+        if failed:  
+            await ctx.send(f"Failed to create invites in: {', '.join(failed)}")  
+
+    @red_commands.command()  
+    @red_commands.check('_is_team_member')  
+    async def sendmessage(self, ctx: red_commands.Context, *, message: str):  
+        """Send an embed message to all team members."""  
+        team_members = await self.config.team_members()  
+        success = []  
+        failed = []  
+
+        embed = discord.Embed(  
+            description=message,  
+            color=0x77bcd6,  
+            timestamp=discord.utils.utcnow()  
+        )  
+        embed.set_author(name=ctx.author.name, icon_url=ctx.author.display_avatar.url)  
+        embed.set_footer(text="Sent by Team Member")  
+
+        for user_id in team_members:  
+            user = self.bot.get_user(user_id)  
+            if not user:  
+                user = await self.bot.fetch_user(user_id)  
+            
+            if user:  
+                try:  
+                    await user.send(embed=embed)  
+                    success.append(user.name)  
+                except Exception as e:  
+                    failed.append(user.name)  
+                    log.error(f"Failed to send message to {user_id}: {e}")  
+
+        await ctx.send(  
+            f"Message sent to {len(success)} team members. "  
+            f"Failed to send to {len(failed)} members: {', '.join(failed)}"  
+        )  
+
+    @red_commands.command()  
+    @red_commands.check('_is_team_member')  
+    async def list(self, ctx: red_commands.Context):  
+        """List all team members."""  
+        team_members = await self.config.team_members()  
+        members = []  
+        for user_id in team_members:  
+            user = self.bot.get_user(user_id)  
+            if not user:  
+                user = await self.bot.fetch_user(user_id)  
+            if user:  
+                members.append(f"{user} ({user_id})")  
+
+        if members:  
+            await ctx.send("Team Members:\n" + "\n".join(members))  
+        else:  
+            await ctx.send("No team members found.")  
+
 def setup(bot: red_commands.Bot):  
     bot.add_cog(TeamRole(bot))
