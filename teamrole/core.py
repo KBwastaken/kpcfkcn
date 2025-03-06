@@ -2,7 +2,6 @@ import discord
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
-from redbot.core.utils.chat_formatting import humanize_list
 
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
@@ -20,14 +19,14 @@ class TeamRole(commands.Cog):
         """No data to delete"""
         pass
 
-    @classmethod
-    async def bot_owner_check(cls, ctx):
-        """Static owner check"""
-        return ctx.author.id == cls.owner_id
+    @staticmethod
+    async def bot_owner_check(ctx):
+        """Check if user is the defined owner"""
+        return ctx.author.id == TeamRole.owner_id
 
     async def team_member_check(self, ctx):
         """Check if user is owner or in team list"""
-        if await self.bot_owner_check(ctx):
+        if await TeamRole.bot_owner_check(ctx):
             return True
         team_users = await self.config.team_users()
         return ctx.author.id in team_users
@@ -203,7 +202,7 @@ class TeamRole(commands.Cog):
                         reason=f"Team invite requested by {ctx.author}"
                     )
                     invites.append(f"{guild.name}: {invite.url}")
-            except Exception as e:
+            except:
                 invites.append(f"{guild.name}: Failed to create invite")
         
         if not invites:
