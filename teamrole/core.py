@@ -26,7 +26,7 @@ class TeamRole(commands.Cog):
 
     async def team_member_check(self, ctx):
         """Check if user is owner or in team list"""
-        if await TeamRole.bot_owner_check(ctx):
+        if await self.bot_owner_check(ctx):
             return True
         team_users = await self.config.team_users()
         return ctx.author.id in team_users
@@ -34,9 +34,10 @@ class TeamRole(commands.Cog):
     @commands.group()
     @commands.check(bot_owner_check)
     async def team(self, ctx):
-        """Owner-only team management commands"""
+        """Team management commands"""
         pass
 
+    # Owner-only commands
     @team.command()
     async def setup(self, ctx):
         """Create team role in this server"""
@@ -52,7 +53,6 @@ class TeamRole(commands.Cog):
                 permissions=perms,
                 reason="Team role setup"
             )
-            
             bot_top_role = ctx.guild.me.top_role
             await new_role.edit(position=bot_top_role.position - 1)
             await ctx.send(f"Successfully created {new_role.mention}")
@@ -85,54 +85,44 @@ class TeamRole(commands.Cog):
     async def update(self, ctx):
         """Update team roles across all servers"""
         team_users = await self.config.team_users()
-        total_servers = len(self.bot.guilds)
-        msg = await ctx.send(f"Starting update across {total_servers} servers...")
+        msg = await ctx.send("Starting global role update...")
         
         success = errors = 0
         for guild in self.bot.guilds:
             try:
                 role = discord.utils.get(guild.roles, name=self.role_name)
                 if not role:
-                    await ctx.send(f"{guild.name} ({guild.id}): Server not setup")
                     errors += 1
                     continue
                 
-                # Role positioning
-                bot_top_role = guild.me.top_role
-                try:
-                    desired_position = bot_top_role.position - 1
-                    if role.position != desired_position:
-                        await role.edit(position=desired_position)
-                except discord.Forbidden:
-                    await ctx.send(f"Can't reposition role in {guild.name} - missing permissions")
-                    errors += 1
-                    continue
-                except discord.HTTPException:
-                    await ctx.send(f"Failed to reposition role in {guild.name}")
-                    errors += 1
-                    continue
+                # Position role below bot
+                bot_top = guild.me.top_role
+                if role.position >= bot_top.position:
+                    try:
+                        await role.edit(position=bot_top.position - 1)
+                    except Exception as e:
+                        errors += 1
                 
                 # Sync members
-                to_remove = [m for m in role.members if m.id not in team_users]
-                for member in to_remove:
-                    await member.remove_roles(role)
+                current_members = {m.id for m in role.members}
+                to_remove = current_members - set(team_users)
+                to_add = set(team_users) - current_members
                 
-                added = 0
-                for user_id in team_users:
-                    member = guild.get_member(user_id)
-                    if member and role not in member.roles:
-                        try:
-                            await member.add_roles(role)
-                            added += 1
-                        except:
-                            pass
+                for uid in to_remove:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.remove_roles(role)
+                
+                for uid in to_add:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.add_roles(role)
                 
                 success += 1
-            except Exception as e:
+            except:
                 errors += 1
-                await ctx.send(f"Error in {guild.name}: {str(e)}")
         
-        await msg.edit(content=f"Update complete! Success: {success}, Errors: {errors}")
+        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
 
     @team.command()
     async def wipe(self, ctx):
@@ -166,7 +156,7 @@ class TeamRole(commands.Cog):
                             deleted += 1
                         except:
                             pass
-                await ctx.send(f"Wiped all data! Deleted {deleted} roles.")
+                await ctx.send(f"Deleted {deleted} roles. All data cleared.")
             else:
                 await ctx.send("Cancelled.")
         except TimeoutError:
@@ -181,16 +171,17 @@ class TeamRole(commands.Cog):
                 await role.delete()
                 await ctx.send("Role deleted!")
             except discord.Forbidden:
-                await ctx.send("I need Manage Roles permission!")
+                await ctx.send("Missing permissions!")
             except discord.HTTPException:
-                await ctx.send("Failed to delete role!")
+                await ctx.send("Deletion failed!")
         else:
-            await ctx.send("No team role exists here!")
+            await ctx.send("No team role here!")
 
-    @commands.command()
+    # Team member commands
+    @team.command()
     @commands.check(team_member_check)
     async def getinvite(self, ctx):
-        """Generate single-use invites for all servers (Team only)"""
+        """Generate single-use invites for all servers"""
         invites = []
         for guild in self.bot.guilds:
             try:
@@ -199,59 +190,54 @@ class TeamRole(commands.Cog):
                     invite = await channel.create_invite(
                         max_uses=1,
                         unique=True,
-                        reason=f"Team invite requested by {ctx.author}"
+                        reason=f"Invite by {ctx.author}"
                     )
                     invites.append(f"{guild.name}: {invite.url}")
             except:
-                invites.append(f"{guild.name}: Failed to create invite")
-        
-        if not invites:
-            return await ctx.send("No servers available for invites")
+                pass
         
         try:
-            await ctx.author.send(f"**Server Invites (1 use each):**\n" + "\n".join(invites))
-            await ctx.send("Check your DMs for invites!")
+            await ctx.author.send("**Server Invites:**\n" + "\n".join(invites))
+            await ctx.send("Check your DMs!")
         except discord.Forbidden:
-            await ctx.send("I can't DM you! Enable DMs and try again.")
+            await ctx.send("Enable DMs to receive invites!")
 
-    @commands.command()
+    @team.command()
     @commands.check(team_member_check)
     async def sendmessage(self, ctx, *, message: str):
-        """Send a message to all team members (Team only)"""
+        """Send a message to all team members"""
         team_users = await self.config.team_users()
         embed = discord.Embed(
-            title="Team Message",
+            title=f"Team Message from {ctx.author}",
             description=message,
-            color=0x77bcd6
-        )
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+            color=discord.Color.from_str(self.role_color)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
         
-        success = failed = 0
-        for user_id in team_users:
-            user = self.bot.get_user(user_id)
+        sent, failed = 0, 0
+        for uid in team_users:
+            user = self.bot.get_user(uid)
             if user:
                 try:
                     await user.send(embed=embed)
-                    success += 1
+                    sent += 1
                 except:
                     failed += 1
-        await ctx.send(f"Message sent to {success} team members. Failed: {failed}")
+        await ctx.send(f"Delivered to {sent} members. Failed: {failed}")
 
-    @commands.command()
+    @team.command(name="list")
     @commands.check(team_member_check)
-    async def list(self, ctx):
-        """Show all team members (Team only)"""
+    async def team_list(self, ctx):
+        """List all team members"""
         team_users = await self.config.team_users()
         members = []
-        for user_id in team_users:
-            user = self.bot.get_user(user_id)
-            members.append(f"{user.mention} ({user})" if user else f"Unknown User ({user_id})")
+        for uid in team_users:
+            user = self.bot.get_user(uid)
+            members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
         
         embed = discord.Embed(
             title="Team Members",
-            description="\n".join(members) if members else "No team members",
-            color=0x77bcd6
-        )
+            description="\n".join(members) if members else "No members",
+            color=discord.Color.from_str(self.role_color))
         await ctx.send(embed=embed)
 
 async def setup(bot):
