@@ -216,7 +216,7 @@ class TeamRole(commands.Cog):
         except TimeoutError:
             return await ctx.send("Timed out waiting for message.")
             
-        embed = discord.Embed(
+        embed = discord.Embed()
             title=f"Team Message from {ctx.author}",
             description=msg.content,
             color=discord.Color.from_str(self.role_color)
