@@ -68,7 +68,7 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("User not in team list")
 
-      @team.command()
+        @team.command()
     async def update(self, ctx):
         """Update team roles across all servers"""
         team_users = await self.config.team_users()
