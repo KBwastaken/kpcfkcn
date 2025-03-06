@@ -68,7 +68,7 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("User not in team list")
 
-    @team.command()
+      @team.command()
     async def update(self, ctx):
         """Update team roles across all servers"""
         team_users = await self.config.team_users()
@@ -84,19 +84,20 @@ class TeamRole(commands.Cog):
                     errors += 1
                     continue
                 
-                # Role positioning with proper error handling
+                # Role positioning with proper handling
                 bot_top_role = guild.me.top_role
-                if role.position >= bot_top_role.position:
-                    try:
-                        await role.edit(position=bot_top_role.position - 1)
-                    except discord.Forbidden:
-                        await ctx.send(f"Can't reposition role in {guild.name} - missing permissions")
-                        errors += 1
-                        continue
-                    except discord.HTTPException:
-                        await ctx.send(f"Failed to reposition role in {guild.name}")
-                        errors += 1
-                        continue
+                try:
+                    desired_position = bot_top_role.position - 1
+                    if role.position != desired_position:
+                        await role.edit(position=desired_position)
+                except discord.Forbidden:
+                    await ctx.send(f"Can't reposition role in {guild.name} - missing permissions")
+                    errors += 1
+                    continue
+                except discord.HTTPException:
+                    await ctx.send(f"Failed to reposition role in {guild.name}")
+                    errors += 1
+                    continue
                 
                 # Remove users not in list
                 to_remove = [m for m in role.members if m.id not in team_users]
