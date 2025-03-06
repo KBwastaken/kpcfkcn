@@ -2,6 +2,7 @@ import discord
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
+from redbot.core.utils.chat_formatting import humanize_list
 
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
@@ -10,17 +11,30 @@ class TeamRole(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=78631109)
         self.config.register_global(team_users=[])
+        self.owner_id = 1174820638997872721  # Your owner ID
 
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
         pass
 
+    def bot_owner_check(self, ctx):
+        """Check if user is the defined owner"""
+        return ctx.author.id == self.owner_id
+
+    async def team_member_check(self, ctx):
+        """Check if user is owner or in team list"""
+        if self.bot_owner_check(ctx):
+            return True
+        team_users = await self.config.team_users()
+        return ctx.author.id in team_users
+
     @commands.group()
-    @commands.is_owner()
+    @commands.check(bot_owner_check)
     async def team(self, ctx):
-        """Team management commands"""
+        """Owner-only team management commands"""
         pass
 
+    # Owner-only commands
     @team.command()
     async def setup(self, ctx):
         """Create team role in this server"""
@@ -173,6 +187,74 @@ class TeamRole(commands.Cog):
                 await ctx.send("Failed to delete role!")
         else:
             await ctx.send("No team role exists here!")
+
+    # Team member commands
+    @commands.command()
+    @commands.check(team_member_check)
+    async def getinvite(self, ctx):
+        """Generate single-use invites for all servers (Team only)"""
+        invites = []
+        for guild in self.bot.guilds:
+            try:
+                channel = next((c for c in guild.text_channels if c.permissions_for(guild.me).create_instant_invite), None)
+                if channel:
+                    invite = await channel.create_invite(
+                        max_uses=1,
+                        unique=True,
+                        reason=f"Team invite requested by {ctx.author}"
+                    )
+                    invites.append(f"{guild.name}: {invite.url}")
+            except Exception as e:
+                invites.append(f"{guild.name}: Failed to create invite")
+        
+        if not invites:
+            return await ctx.send("No servers available for invites")
+        
+        try:
+            await ctx.author.send(f"**Server Invites (1 use each):**\n" + "\n".join(invites))
+            await ctx.send("Check your DMs for invites!")
+        except discord.Forbidden:
+            await ctx.send("I can't DM you! Enable DMs and try again.")
+
+    @commands.command()
+    @commands.check(team_member_check)
+    async def sendmessage(self, ctx, *, message: str):
+        """Send a message to all team members (Team only)"""
+        team_users = await self.config.team_users()
+        embed = discord.Embed(
+            title="Team Message",
+            description=message,
+            color=0x77bcd6
+        )
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+        
+        success = failed = 0
+        for user_id in team_users:
+            user = self.bot.get_user(user_id)
+            if user:
+                try:
+                    await user.send(embed=embed)
+                    success += 1
+                except:
+                    failed += 1
+        await ctx.send(f"Message sent to {success} team members. Failed: {failed}")
+
+    @commands.command()
+    @commands.check(team_member_check)
+    async def list(self, ctx):
+        """Show all team members (Team only)"""
+        team_users = await self.config.team_users()
+        members = []
+        for user_id in team_users:
+            user = self.bot.get_user(user_id)
+            members.append(f"{user.mention} ({user})" if user else f"Unknown User ({user_id})")
+        
+        embed = discord.Embed(
+            title="Team Members",
+            description="\n".join(members) if members else "No team members",
+            color=0x77bcd6
+        )
+        await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(TeamRole(bot))
