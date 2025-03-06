@@ -2,6 +2,6 @@
 
 from .advancedlogs import AdvancedLogs
 
-def setup(bot):
+async def setup(bot):
     """Load the AdvancedLogs cog."""
-    bot.add_cog(AdvancedLogs(bot))
+    await bot.add_cog(AdvancedLogs(bot))
