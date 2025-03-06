@@ -203,10 +203,10 @@ class TeamRole(commands.Cog):
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
-    async def sendmessage(self, ctx):
+async def sendmessage(self, ctx):
         """Send a message to all team members (supports images)"""
         await ctx.send("Please type your message (you have 5 minutes):")
-        
+
         try:
             msg = await self.bot.wait_for(
                 "message",
@@ -215,29 +215,47 @@ class TeamRole(commands.Cog):
             )
         except TimeoutError:
             return await ctx.send("Timed out waiting for message.")
-            
+
         embed = discord.Embed(
             title=f"Team Message from {ctx.author}",
             description=msg.content,
             color=discord.Color.from_str(self.role_color)
+        )
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-        
+
         if msg.attachments:
             embed.set_image(url=msg.attachments[0].url)
-        
+
         team_users = await self.config.team_users()
         sent, failed = 0, 0
-        
+
         for uid in team_users:
             user = self.bot.get_user(uid)
             if user:
                 try:
                     await user.send(embed=embed)
                     sent += 1
-                except:
+                except discord.Forbidden:
                     failed += 1
-        
+
         await ctx.send(f"Message delivered to {sent} members. Failed: {failed}")
+
+    @team.command(name="list")
+    @commands.check("team_member_check")
+    async def team_list(self, ctx):
+        """List all team members"""
+        team_users = await self.config.team_users()
+        members = []
+        for uid in team_users:
+            user = self.bot.get_user(uid)
+            members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
+
+        embed = discord.Embed(
+            title="Team Members",
+            description="\n".join(members) if members else "No members",
+            color=discord.Color.from_str(self.role_color)
+        )
+        await ctx.send(embed=embed)
 
     @team.command(name="list")
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
