@@ -3,6 +3,8 @@ from redbot.core import commands, Config
 from redbot.core.bot import Red
 from datetime import datetime
 import re
+import tempfile
+import os
 
 class DMLogger(commands.Cog):
     """Logs DMs sent to the bot and forwards them to a designated server/channel."""
@@ -14,7 +16,7 @@ class DMLogger(commands.Cog):
         
         # Predefined list of trusted domains
         self.trusted_domains = [
-            "youtube.com",   # All YouTube domains allowed
+            "youtube.com",   # All YouTube domains allowed (including youtu.be)
             "discord.com",   # Discord links allowed
             "github.com",    # GitHub links allowed
             "twitter.com",   # Twitter links allowed
@@ -25,7 +27,6 @@ class DMLogger(commands.Cog):
 
         # Predefined list of known scam/malicious domains
         self.scam_domains = [
-            "youtu.be",      # YouTube short URL
             "bit.ly",        # URL shortener often used for scams
             "t.co",          # Twitter's short URL
             "tinyurl.com",   # URL shortener often misused
@@ -72,7 +73,8 @@ class DMLogger(commands.Cog):
         mutual_guilds_text = ", ".join(mutual_guilds) if mutual_guilds else "None"
         
         message_content = message.content or "*No text content*"
-        if len(message_content) > 1024:
+        # Ensure the message content does not exceed 1024 characters for embeds
+        if len(message_content) > 1020:
             message_content = message_content[:1020] + "... (truncated)"
         
         # Check for suspicious or untrusted links
@@ -80,35 +82,52 @@ class DMLogger(commands.Cog):
         for link in re.findall(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
             domain = link.split("/")[2]
             
-            # Allow YouTube domain and block shortened YouTube (youtu.be) links
-            if "youtube.com" in domain and "youtu.be" not in domain:
+            # Allow YouTube domains (both youtube.com and youtu.be)
+            if "youtube.com" in domain or "youtu.be" in domain:
                 continue  # It's a valid YouTube link
-            elif domain in self.scam_domains:  # Block known scam domains
+            
+            # Block known scam domains
+            elif domain in self.scam_domains:
                 suspicious_links.append(link)
             elif domain not in self.trusted_domains:  # Allow other trusted domains
                 suspicious_links.append(link)
 
         if suspicious_links:
-            await channel.send(f"🚨 **Sketchy Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
+            await channel.send(f"🚨 **Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
         
-        embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
-        embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
-        embed.add_field(name="Message", value=message_content, inline=False)
-        embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
-        
-        await channel.send(embed=embed)
-        
-        # Send attachments separately
+        # If the message exceeds Discord embed length (1024 characters per embed field), save it as a file
+        if len(message_content) > 1024:  # Discord message length limit for embeds
+            # Save to a temporary .txt file if the message is too long for an embed
+            with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8", suffix=".txt") as f:
+                file_path = f.name
+                f.write(f"DM from {user} ({user.id})\n")
+                f.write(f"Message: {message_content}\n")
+                f.write(f"Mutual Servers: {mutual_guilds_text}\n")
+
+            # Send the file to the channel as an attachment (this allows it to be clickable)
+            await channel.send(f"🚨 **Message too long!** 🚨\nSending as a file instead:", file=discord.File(file_path))
+            os.remove(file_path)  # Clean up the file after sending
+        else:
+            # Ensure the embed fields are not too long
+            embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
+            embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
+            embed.add_field(name="Message", value=message_content, inline=False)
+            embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
+            
+            await channel.send(embed=embed)
+
+        # Handling Attachments (Voice Messages, Stickers, Emojis, GIFs)
         if message.attachments:
-            for att in message.attachments:
-                await channel.send(f"📎 **Attachment:** {att.url}")
+            for attachment in message.attachments:
+                await channel.send(f"📎 **Attachment:** {attachment.url}")
         
-        # Send stickers separately
+        # Handling stickers: Show the sticker name and its URL (so you can click it)
         if message.stickers:
             for sticker in message.stickers:
-                await channel.send(f"🖼️ **Sticker:** {sticker.name}\n{sticker.url}")
-        
-        # Voice message detection (if applicable)
+                sticker_url = sticker.url
+                await channel.send(f"🖼️ **Sticker:** {sticker.name}\n**URL:** {sticker_url}")
+
+        # Handling voice messages (e.g., .ogg or voice-message files)
         for attachment in message.attachments:
             if attachment.filename.endswith(".ogg") or "voice-message" in attachment.filename:
                 await channel.send(f"🎙️ **Voice Message:** {attachment.url}")
