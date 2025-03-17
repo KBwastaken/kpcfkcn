@@ -18,3 +18,6 @@ class TweakingCog(commands.Cog):
         
         # Send the response along with the GIF link
         await ctx.send(f"{response} \n\nhttps://tenor.com/view/skeleton-banging-fist-on-ground-agony-anguish-pain-suffering-gif-10047053495593873096")
+
+def setup(bot):
+    bot.add_cog(TweakingCog(bot))
