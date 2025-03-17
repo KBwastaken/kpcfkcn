@@ -12,6 +12,7 @@ class TweakingCog(commands.Cog):
             f"Uh oh! Looks like {ctx.author.mention} is TWEAKING. Proceed with caution!",
             f"Yikes! {ctx.author.mention} is TWEAKING! Hold on tight, this is about to get wild!",
             f"{ctx.author.mention} is in full tweak mode! Get ready for the chaos!"
+            f"{ctx.author.mention} Fein"
         ]
         
         response = random.choice(responses)
