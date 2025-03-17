@@ -1,4 +1,4 @@
 from .numbergenerator import NumberGeneratorCog
 
-def setup(bot):
-    bot.add_cog(NumberGeneratorCog(bot))
+async def setup(bot):
+    await bot.add_cog(NumberGeneratorCog(bot))
