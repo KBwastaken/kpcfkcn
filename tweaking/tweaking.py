@@ -11,7 +11,7 @@ class TweakingCog(commands.Cog):
             f"Oh no! {ctx.author.mention} is TWEAKING! Someone help them out before they break something!",
             f"Uh oh! Looks like {ctx.author.mention} is TWEAKING. Proceed with caution!",
             f"Yikes! {ctx.author.mention} is TWEAKING! Hold on tight, this is about to get wild!",
-            f"{ctx.author.mention} is in full tweak mode! Get ready for the chaos!"
+            f"{ctx.author.mention} is in full tweak mode! Get ready for the chaos!",
             f"{ctx.author.mention} Fein"
         ]
         
