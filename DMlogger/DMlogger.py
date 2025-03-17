@@ -50,8 +50,20 @@ class DMLogger(commands.Cog):
         embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
         embed.add_field(name="Message", value=message.content or "*No text content*", inline=False)
         
+        # Check for attachments (images, gifs, voice messages)
         if message.attachments:
+            attachment_urls = [att.url for att in message.attachments]
+            embed.add_field(name="Attachments", value="\n".join(attachment_urls), inline=False)
             embed.set_image(url=message.attachments[0].url)
+        
+        # Check for stickers
+        if message.stickers:
+            embed.add_field(name="Sticker", value=message.stickers[0].name, inline=False)
+            embed.set_image(url=message.stickers[0].url)
+        
+        # Check for emojis (Only custom emojis will have URLs)
+        if any(char for char in message.content if char in message.guild.emojis):
+            embed.add_field(name="Emojis", value=message.content, inline=False)
         
         embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
         
