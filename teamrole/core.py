@@ -1,22 +1,12 @@
-import discord  
-from redbot.core import commands, Config  
-from redbot.core.utils import menus  
-from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate  
-
 class TeamRole(commands.Cog):  
-    """Manage team role across all servers"""  
-    
     def __init__(self, bot):  
         self.bot = bot  
-        self.config = Config.get_conf(self, identifier=78631109)  
-        self.config.register_global(team_users=[])  
-        self.owner_id = 1174820638997872721  # Your owner ID  
-        self.role_name = "KCN | Team"  
-        self.role_color = "#77bcd6"  
+        self.owner_id = None  
+        self.role_name = "TeamRole"  
+        self.role_color = "#FF0000"  
 
-    async def red_delete_data_for_user(self, **kwargs):  
-        """No data to delete"""  
-        pass  
+    async def cog_load(self):  
+        self.owner_id = (await self.bot.application_info()).owner.id  
 
     async def bot_owner_check(self, ctx):  
         """Check if user is the defined owner"""  
