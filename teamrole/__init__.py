@@ -1,4 +1,5 @@
-from .core import TeamRole
+"""TeamRole cog for Red Discord Bot."""  
+from .core import TeamRole  
 
-async def setup(bot):
+async def setup(bot):  
     await bot.add_cog(TeamRole(bot))
