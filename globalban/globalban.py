@@ -53,7 +53,7 @@ class GlobalBan(commands.Cog):
     
     async def ban_user(self, guild, user):
         try:
-            await guild.ban(user, reason="Global ban sync", delete_message_days=0)
+            await guild.ban(user, reason="Global ban sync", delete_message_seconds=0)
         except discord.Forbidden:
             log.warning(f"No permission to ban in {guild.name}")
         except discord.HTTPException as e:
