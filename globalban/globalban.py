@@ -10,16 +10,17 @@ class GlobalBan(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
         self.config.register_global(ban_list={})
+        self.bot.loop.create_task(self.startup_tasks())
+    
+    async def startup_tasks(self):
+        await self.bot.wait_until_ready()
+        log.info("Running initial global ban list update...")
+        await self.globalbanupdatelist(None)
+        log.info("Initial global ban list update complete. Now syncing bans...")
+        await self.sync_bans()
+        log.info("Initial ban sync complete.")
         self.ban_update_task = self.bot.loop.create_task(self.ban_update_loop())
         self.ban_sync_task = self.bot.loop.create_task(self.ban_sync_loop())
-    
-    async def ban_update_loop(self):
-        await self.bot.wait_until_ready()
-        while True:
-            log.info("Starting 6-hour global ban list update...")
-            await self.globalbanupdatelist(None)
-            log.info("Global ban list update complete. Next update in 6 hours.")
-            await asyncio.sleep(21600)  # 6 hours
     
     async def ban_sync_loop(self):
         await self.bot.wait_until_ready()
@@ -28,6 +29,14 @@ class GlobalBan(commands.Cog):
             await self.sync_bans()
             log.info("Global ban sync complete. Next sync in 12 hours.")
             await asyncio.sleep(43200)  # 12 hours
+    
+    async def ban_update_loop(self):
+        await self.bot.wait_until_ready()
+        while True:
+            log.info("Starting 6-hour global ban list update...")
+            await self.globalbanupdatelist(None)
+            log.info("Global ban list update complete. Next update in 6 hours.")
+            await asyncio.sleep(21600)  # 6 hours
     
     async def sync_bans(self):
         ban_list = await self.config.ban_list()
