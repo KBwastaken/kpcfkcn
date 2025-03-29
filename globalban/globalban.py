@@ -14,16 +14,15 @@ class GlobalBan(commands.Cog):
     
     async def startup_tasks(self):
         await self.bot.wait_until_ready()
-        log.info("Running initial global ban list update...")
+        log.info("Starting initial global ban list update...")
         await self.globalbanupdatelist(None)
         log.info("Initial global ban list update complete. Now syncing bans...")
         await self.sync_bans()
-        log.info("Initial ban sync complete.")
-        self.ban_update_task = self.bot.loop.create_task(self.ban_update_loop())
-        self.ban_sync_task = self.bot.loop.create_task(self.ban_sync_loop())
+        log.info("Initial ban sync complete. Setting up loops...")
+        self.bot.loop.create_task(self.ban_update_loop())
+        self.bot.loop.create_task(self.ban_sync_loop())
     
     async def ban_sync_loop(self):
-        await self.bot.wait_until_ready()
         while True:
             log.info("Starting 12-hour global ban sync...")
             await self.sync_bans()
@@ -31,7 +30,6 @@ class GlobalBan(commands.Cog):
             await asyncio.sleep(43200)  # 12 hours
     
     async def ban_update_loop(self):
-        await self.bot.wait_until_ready()
         while True:
             log.info("Starting 6-hour global ban list update...")
             await self.globalbanupdatelist(None)
@@ -40,23 +38,27 @@ class GlobalBan(commands.Cog):
     
     async def sync_bans(self):
         ban_list = await self.config.ban_list()
+        chunk_size = 1000  # Prevent rate limits
         for guild in self.bot.guilds:
             log.info(f"Syncing bans for {guild.name}...")
             count = 0
-            for user_id in ban_list.keys():
-                user = discord.Object(id=int(user_id))
-                try:
-                    await guild.ban(user, reason="Global ban sync")
-                    count += 1
-                    if count % 20 == 0:
-                        log.info(f"{count} bans synced in {guild.name}")
-                    await asyncio.sleep(1)  # Prevent rate limits
-                except discord.Forbidden:
-                    log.warning(f"No permission to ban in {guild.name}")
-                except discord.HTTPException as e:
-                    log.error(f"Error banning in {guild.name}: {e}")
+            for i in range(0, len(ban_list), chunk_size):
+                batch = list(ban_list.keys())[i:i + chunk_size]
+                for user_id in batch:
+                    user = discord.Object(id=int(user_id))
+                    try:
+                        await guild.ban(user, reason="Global ban sync", delete_message_days=0)
+                        count += 1
+                        if count % 20 == 0:
+                            log.info(f"{count} bans synced in {guild.name}")
+                        await asyncio.sleep(1)  # Prevent rate limits
+                    except discord.Forbidden:
+                        log.warning(f"No permission to ban in {guild.name}")
+                    except discord.HTTPException as e:
+                        log.error(f"Error banning in {guild.name}: {e}")
+                log.info(f"Batch of {len(batch)} bans synced in {guild.name}.")
             log.info(f"All bans synced in {guild.name} ({count} total).")
-
+    
     @commands.command()
     async def bansync(self, ctx):
         """Manually sync global bans across all servers."""
@@ -138,7 +140,7 @@ class GlobalBan(commands.Cog):
     
     @commands.command()
     async def globalban(self, ctx, user: discord.User, *, reason="No reason provided"):
-        """Ban a user globally"""
+        """Ban a user globally."""
         ban_list = await self.config.ban_list()
         if str(user.id) in ban_list:
             await ctx.send("User is already globally banned.")
@@ -149,7 +151,7 @@ class GlobalBan(commands.Cog):
         
         for guild in self.bot.guilds:
             try:
-                await guild.ban(user, reason=f"Global ban: {reason}")
+                await guild.ban(user, reason=f"Global ban: {reason}", delete_message_days=0)
             except discord.Forbidden:
                 log.warning(f"No permission to ban {user} in {guild.name}")
             except discord.HTTPException as e:
