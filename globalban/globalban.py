@@ -40,15 +40,13 @@ class GlobalBan(commands.Cog):
         ban_list = await self.config.ban_list()
         for guild in self.bot.guilds:
             log.info(f"Syncing bans for {guild.name}...")
-            tasks = []
+            count = 0
             for user_id in ban_list.keys():
                 user = discord.Object(id=int(user_id))
-                tasks.append(self.ban_user(guild, user))
-                if len(tasks) % 20 == 0:
-                    await asyncio.gather(*tasks)
-                    tasks.clear()
-            if tasks:
-                await asyncio.gather(*tasks)
+                await self.ban_user(guild, user)
+                count += 1
+                if count % 20 == 0:
+                    log.info(f"{count} bans synced in {guild.name}.")
             log.info(f"All bans synced in {guild.name}.")
     
     async def ban_user(self, guild, user):
@@ -108,11 +106,13 @@ class GlobalBan(commands.Cog):
     
     @commands.command()
     async def globalbanupdatelist(self, ctx):
-        """Fetch all bans from all servers and update the global list."""
-        log.info("Updating global ban list from the current servers...")
-        banned_users = {}
+        """Fetch bans server by server and update the global list."""
+        log.info("Updating global ban list server by server...")
+        banned_users = await self.config.ban_list()
         
-        async def fetch_bans(guild):
+        for guild in self.bot.guilds:
+            log.info(f"Fetching bans from {guild.name}...")
+            count = 0
             try:
                 async for ban_entry in guild.bans():
                     user_id = str(ban_entry.user.id)
@@ -121,13 +121,16 @@ class GlobalBan(commands.Cog):
                             "reason": ban_entry.reason or "No reason provided",
                             "banned_by": "Unknown"
                         }
+                        count += 1
+                        if count % 5 == 0:
+                            log.info(f"Still fetching bans... {count} users added so far.")
+                log.info(f"Finished fetching from {guild.name}. Total bans: {len(banned_users)}")
             except discord.HTTPException as e:
                 log.error(f"Error fetching bans from {guild.name}: {e}")
-        
-        await asyncio.gather(*(fetch_bans(guild) for guild in self.bot.guilds))
+                continue
         
         await self.config.ban_list.set(banned_users)
-        log.info(f"All fetched, list updated. Total bans: {len(banned_users)}")
+        log.info(f"All servers processed, list updated. Total bans: {len(banned_users)}")
         if ctx:
             await ctx.send(f"Global ban list updated. {len(banned_users)} bans recorded.")
     
