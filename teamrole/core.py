@@ -86,21 +86,44 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("User not in team list")
 
-    @team.command()
+    @team.command()  
     @commands.is_owner()
-    async def wipe(self, ctx):
-        """Wipe all team data"""
-        await self.config.team_users.set([])
-        deleted = 0
-        for guild in self.bot.guilds:
-            role = discord.utils.get(guild.roles, name=self.role_name)
-            if role:
-                try:
-                    await role.delete()
-                    deleted += 1
-                except:
-                    pass
-        await ctx.send(f"Deleted {deleted} roles. All data cleared.")
+    async def wipe(self, ctx):  
+         """Wipe all team data"""  
+         try:  
+             await ctx.send("Type password to confirm wipe:")  
+             msg = await self.bot.wait_for(  
+                 "message",  
+                 check=MessagePredicate.same_context(ctx),  
+                 timeout=30  
+             )  
+             if msg.content.strip() != "kkkkayaaaaa":  
+                 return await ctx.send("Invalid password!")  
+             
+             confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")  
+             start_adding_reactions(confirm_msg, ["✅", "❌"])  
+             
+             pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)  
+             await self.bot.wait_for("reaction_add", check=pred, timeout=30)  
+             
+             if pred.result == 0:  
+                 await ctx.send("Wiping all data...")  
+                 await self.config.team_users.set([])  
+                 
+                 deleted = 0  
+                 for guild in self.bot.guilds:  
+                     role = discord.utils.get(guild.roles, name=self.role_name)  
+                     if role:  
+                         try:  
+                             await role.delete()  
+                             deleted += 1  
+                         except:  
+                             pass  
+                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")  
+             else:  
+                 await ctx.send("Cancelled.")  
+         except TimeoutError:  
+             await ctx.send("Operation timed out.")  
 
     @team.command()
     @commands.is_owner()
