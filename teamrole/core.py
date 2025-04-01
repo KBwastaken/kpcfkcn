@@ -97,6 +97,15 @@ class TeamRole(commands.Cog):
                 else:
                     await ctx.send(f"❌ **Error:** Failed to create `{channel_name}`", delete_after=120)
 
+            # Create private voice channel "Team Office"
+            await ctx.send("⏳ **Creating private voice channel 'Team Office'...**")
+            voice_channel = await ctx.guild.create_voice_channel("Team Office", category=category, overwrites=overwrites)
+
+            if voice_channel:
+                await ctx.send(f"✅ **Voice channel created:** {voice_channel.name}", delete_after=30)
+            else:
+                await ctx.send("❌ **Error:** Failed to create voice channel!", delete_after=120)
+
         except discord.Forbidden:
             await ctx.send("❌ **Error:** I need `Manage Roles` and `Manage Channels` permissions!", delete_after=120)
         except discord.HTTPException as e:
@@ -210,6 +219,20 @@ class TeamRole(commands.Cog):
                 await ctx.send(f"❌ **Error:** Failed to delete category! `{e}`", delete_after=120)
         else:
             await ctx.send("⚠️ **No category named 'KCN' found. Skipping category deletion.**", delete_after=120)
+
+        # Delete "Team Office" voice channel if it exists
+        team_office = discord.utils.get(ctx.guild.voice_channels, name="Team Office")
+        if team_office:
+            try:
+                await ctx.send(f"⏳ **Deleting voice channel:** {team_office.name}...", delete_after=30)
+                await team_office.delete()
+                await ctx.send("✅ **Voice channel deleted!**", delete_after=30)
+            except discord.Forbidden:
+                await ctx.send("❌ **Error:** Missing permissions to delete voice channel!", delete_after=120)
+            except discord.HTTPException as e:
+                await ctx.send(f"❌ **Error:** Failed to delete voice channel! `{e}`", delete_after=120)
+        else:
+            await ctx.send("⚠️ **No voice channel named 'Team Office' found. Skipping deletion.**", delete_after=120)
 
         await ctx.send("🎉 **Deletion process complete!**")
 
