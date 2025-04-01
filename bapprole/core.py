@@ -39,7 +39,7 @@ class bapprole(commands.Cog):
 
     # OWNER-ONLY COMMANDS
     @bapp.command()
-    @commands.is_owner()
+    @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
     async def setup(self, ctx):
         """Create bapp role in this server"""
         existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
