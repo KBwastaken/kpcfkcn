@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from redbot.core.bot import Red
 
+
 class RoleManager(commands.Cog):
     """Role Management Cog for Redbot."""
 
