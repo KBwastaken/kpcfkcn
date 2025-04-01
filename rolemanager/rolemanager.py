@@ -26,14 +26,14 @@ class RoleManager(commands.Cog):
     async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
         """Assign a role to a user."""
         await user.add_roles(role)
-        await interaction.response.send_message(f"Assigned {role.name} to {user.display_name}.", ephemeral=True)
+        await interaction.response.send_message(f"Assigned {role.name} to {user.display_name}.", ephemeral=False)
 
     @app_commands.command(name="unassignrole", description="Removes a role from a user.")
     @app_commands.describe(role="Role to remove", user="User to remove role from")
     async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
         """Remove a role from a user."""
         await user.remove_roles(role)
-        await interaction.response.send_message(f"Removed {role.name} from {user.display_name}.", ephemeral=True)
+        await interaction.response.send_message(f"Removed {role.name} from {user.display_name}.", ephemeral=False)
 
     @app_commands.command(name="assignmultirole", description="Assign multiple roles to a user (max 6).")
     @app_commands.describe(
@@ -49,9 +49,9 @@ class RoleManager(commands.Cog):
         """Assign multiple roles to a user (max 6)."""
         roles = [role for role in [role1, role2, role3, role4, role5, role6] if role]
         if not roles:
-            return await interaction.response.send_message("No valid roles provided.", ephemeral=True)
+            return await interaction.response.send_message("No valid roles provided.", ephemeral=False)
         await user.add_roles(*roles)
-        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in roles])} to {user.display_name}.", ephemeral=True)
+        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in roles])} to {user.display_name}.", ephemeral=False)
 
     @app_commands.command(name="unassignmultirole", description="Removes multiple roles from a user (max 6).")
     @app_commands.describe(
@@ -67,15 +67,15 @@ class RoleManager(commands.Cog):
         """Remove multiple roles from a user (max 6)."""
         roles = [role for role in [role1, role2, role3, role4, role5, role6] if role]
         if not roles:
-            return await interaction.response.send_message("No valid roles provided.", ephemeral=True)
+            return await interaction.response.send_message("No valid roles provided.", ephemeral=False)
         await user.remove_roles(*roles)
-        await interaction.response.send_message(f"Removed {', '.join([role.name for role in roles])} from {user.display_name}.", ephemeral=True)
+        await interaction.response.send_message(f"Removed {', '.join([role.name for role in roles])} from {user.display_name}.", ephemeral=False)
 
     @app_commands.command(name="massrole", description="Give or remove a role from all members.")
     async def massrole(self, interaction: discord.Interaction, role: discord.Role, action: str):
         """Give or remove a role from all members."""
         if action.lower() not in ["give", "remove"]:
-            return await interaction.response.send_message("Invalid action. Use 'give' or 'remove'.", ephemeral=True)
+            return await interaction.response.send_message("Invalid action. Use 'give' or 'remove'.", ephemeral=False)
         guild = interaction.guild
         members = guild.members
         if action.lower() == "give":
@@ -96,7 +96,7 @@ class RoleManager(commands.Cog):
         discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
         discord_roles = [role for role in discord_roles if role]
         if not discord_roles:
-            return await interaction.response.send_message("No valid roles found.", ephemeral=True)
+            return await interaction.response.send_message("No valid roles found.", ephemeral=False)
         for member in interaction.guild.members:
             if base_role in member.roles:
                 await member.add_roles(*discord_roles)
