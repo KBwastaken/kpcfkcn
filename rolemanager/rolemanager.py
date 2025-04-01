@@ -11,15 +11,26 @@ class RoleManager(commands.Cog):
         self.bot = bot
         self.tree = bot.tree
 
-    async def sync_slash_commands(self):
-        self.tree.clear_commands(guild=None)  # Clear old commands
-        self.tree.add_command(self.assignrole)
-        self.tree.add_command(self.unassignrole)
-        self.tree.add_command(self.assignmultirole)
-        self.tree.add_command(self.unassignmultirole)
-        self.tree.add_command(self.massrole)
-        self.tree.add_command(self.roleif)
-        await self.tree.sync()
+async def sync_slash_commands(self):
+    """Syncs the slash commands for this cog without clearing the existing commands."""
+    # Only add the commands, don't clear existing commands
+    commands_to_add = [
+        self.assignrole,
+        self.unassignrole,
+        self.assignmultirole,
+        self.unassignmultirole,
+        self.massrole,
+        self.roleif
+    ]
+    
+    for command in commands_to_add:
+        # If the command is not already added to the tree, add it.
+        if command.name not in [cmd.name for cmd in self.tree.get_commands()]:
+            self.tree.add_command(command)
+
+    # Sync the commands with Discord
+    await self.tree.sync()
+    print("Sync complete: Commands have been successfully synced.")
 
     @app_commands.command(name="assignrole", description="Assigns a role to a user.")
     @app_commands.describe(role="Role to assign", user="User to assign role to")
