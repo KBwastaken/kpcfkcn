@@ -11,14 +11,8 @@ class RoleManager(commands.Cog):
         self.bot = bot
         self.tree = bot.tree
 
-    async def sync_slash_commands(self):
-        self.tree.add_command(self.assignrole)
-        self.tree.add_command(self.unassignrole)
-        self.tree.add_command(self.assignmultirole)
-        self.tree.add_command(self.unassignmultirole)
-        self.tree.add_command(self.massrole)
-        self.tree.add_command(self.roleif)
-        await self.tree.sync()
+   async def sync_slash_commands(self):
+    await self.bot.tree.sync()  # Let Redbot handle command registration
 
     def can_manage_role(self, interaction: discord.Interaction, role: discord.Role) -> bool:
         user = interaction.user
