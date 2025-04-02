@@ -1,9 +1,3 @@
-# rolemanager/rolemanager.py
-from redbot.core import commands
-import discord
-from discord import app_commands
-from redbot.core.bot import Red
-
 class RoleManager(commands.Cog):
     """Role Management Cog for Redbot."""
 
@@ -21,24 +15,25 @@ class RoleManager(commands.Cog):
         self.tree.add_command(self.roleif)
         await self.tree.sync()
 
-    def can_manage_role(self, interaction: discord.Interaction, role: discord.Role) -> bool:
-        """Checks if the user can manage the given role."""
-        user = interaction.user
-        guild = interaction.guild  # Ensure guild is available
-        member = guild.get_member(user.id)  # Get full member object
-
-        if not member or not member.top_role:  # Prevent NoneType error
-            return False
-
-        if user.id == 1174820638997872721:  # Exempt user ID
+    def can_assign_role(self, user: discord.Member, role: discord.Role):
+        """Check if the user can assign the given role based on hierarchy."""
+        # If the user is the exempted user, return True
+        if user.id == 1174820638997872721:
             return True
-
-        return member.top_role.position > role.position
+        
+        # Check if the role to be assigned is higher than user's highest role
+        highest_role = user.top_role
+        if role.position > highest_role.position:
+            return False
+        return True
 
     @app_commands.command(name="assignrole", description="Assigns a role to a user.")
     @app_commands.describe(role="Role to assign", user="User to assign role to")
     async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
         """Assign a role to a user."""
+        if not self.can_assign_role(interaction.user, role):
+            return await interaction.response.send_message("You cannot assign a role higher than your current highest role.", ephemeral=True)
+        
         await user.add_roles(role)
         await interaction.response.send_message(f"Assigned {role.name} to {user.display_name}.", ephemeral=False)
 
@@ -46,6 +41,9 @@ class RoleManager(commands.Cog):
     @app_commands.describe(role="Role to remove", user="User to remove role from")
     async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
         """Remove a role from a user."""
+        if not self.can_assign_role(interaction.user, role):
+            return await interaction.response.send_message("You cannot remove a role higher than your current highest role.", ephemeral=True)
+        
         await user.remove_roles(role)
         await interaction.response.send_message(f"Removed {role.name} from {user.display_name}.", ephemeral=False)
 
@@ -64,6 +62,12 @@ class RoleManager(commands.Cog):
         roles = [role for role in [role1, role2, role3, role4, role5, role6] if role]
         if not roles:
             return await interaction.response.send_message("No valid roles provided.", ephemeral=False)
+
+        # Check if any role is higher than the user's current role
+        for role in roles:
+            if not self.can_assign_role(interaction.user, role):
+                return await interaction.response.send_message(f"You cannot assign {role.name} because it is higher than your current highest role.", ephemeral=True)
+
         await user.add_roles(*roles)
         await interaction.response.send_message(f"Assigned {', '.join([role.name for role in roles])} to {user.display_name}.", ephemeral=False)
 
@@ -82,6 +86,12 @@ class RoleManager(commands.Cog):
         roles = [role for role in [role1, role2, role3, role4, role5, role6] if role]
         if not roles:
             return await interaction.response.send_message("No valid roles provided.", ephemeral=False)
+
+        # Check if any role is higher than the user's current role
+        for role in roles:
+            if not self.can_assign_role(interaction.user, role):
+                return await interaction.response.send_message(f"You cannot remove {role.name} because it is higher than your current highest role.", ephemeral=True)
+
         await user.remove_roles(*roles)
         await interaction.response.send_message(f"Removed {', '.join([role.name for role in roles])} from {user.display_name}.", ephemeral=False)
 
@@ -90,6 +100,11 @@ class RoleManager(commands.Cog):
         """Give or remove a role from all members."""
         if action.lower() not in ["give", "remove"]:
             return await interaction.response.send_message("Invalid action. Use 'give' or 'remove'.", ephemeral=False)
+
+        # Check if the role can be assigned by the bot's highest role
+        if not self.can_assign_role(interaction.user, role):
+            return await interaction.response.send_message(f"You cannot give {role.name} because it is higher than your current highest role.", ephemeral=True)
+
         guild = interaction.guild
         members = guild.members
         if action.lower() == "give":
@@ -111,6 +126,12 @@ class RoleManager(commands.Cog):
         discord_roles = [role for role in discord_roles if role]
         if not discord_roles:
             return await interaction.response.send_message("No valid roles found.", ephemeral=False)
+
+        # Check if any role is higher than the user's current role
+        for role in discord_roles:
+            if not self.can_assign_role(interaction.user, role):
+                return await interaction.response.send_message(f"You cannot assign {role.name} because it is higher than your current highest role.", ephemeral=True)
+
         for member in interaction.guild.members:
             if base_role in member.roles:
                 await member.add_roles(*discord_roles)
