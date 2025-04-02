@@ -1,4 +1,3 @@
-# rolemanager/rolemanager.py
 from redbot.core import commands
 import discord
 from discord import app_commands
@@ -9,25 +8,29 @@ class RoleManager(commands.Cog):
 
     def __init__(self, bot: Red):
         self.bot = bot
-        self.tree = bot.tree
-
-   async def sync_slash_commands(self):
-    await self.bot.tree.sync()  # Let Redbot handle command registration
 
     def can_manage_role(self, interaction: discord.Interaction, role: discord.Role) -> bool:
+        """Checks if the user can manage the given role."""
         user = interaction.user
+        guild = interaction.guild  # Ensure guild is available
+        member = guild.get_member(user.id)  # Get full member object
+
+        if not member or not member.top_role:  # Prevent NoneType error
+            return False
+
         if user.id == 1174820638997872721:  # Exempt user ID
             return True
-        return user.top_role.position > role.position
 
-    @app_commands.command(name="assignrole", description="Assigns a role to a user.")
+        return member.top_role.position > role.position
+
+    @app_commands.command(name="assignrole", description="Assign a role to a user.")
     async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member, ephemeral: bool = True):
         if not self.can_manage_role(interaction, role):
             return await interaction.response.send_message("You can't assign roles above your own.", ephemeral=True)
         await user.add_roles(role)
         await interaction.response.send_message(f"Assigned {role.name} to {user.display_name}.", ephemeral=ephemeral)
 
-    @app_commands.command(name="unassignrole", description="Removes a role from a user.")
+    @app_commands.command(name="unassignrole", description="Remove a role from a user.")
     async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member, ephemeral: bool = True):
         if not self.can_manage_role(interaction, role):
             return await interaction.response.send_message("You can't remove roles above your own.", ephemeral=True)
@@ -35,7 +38,12 @@ class RoleManager(commands.Cog):
         await interaction.response.send_message(f"Removed {role.name} from {user.display_name}.", ephemeral=ephemeral)
 
     @app_commands.command(name="assignmultirole", description="Assign multiple roles to a user (max 6).")
-    async def assignmultirole(self, interaction: discord.Interaction, user: discord.Member, role1: discord.Role = None, role2: discord.Role = None, role3: discord.Role = None, role4: discord.Role = None, role5: discord.Role = None, role6: discord.Role = None, ephemeral: bool = True):
+    async def assignmultirole(
+        self, interaction: discord.Interaction, user: discord.Member,
+        role1: discord.Role = None, role2: discord.Role = None, role3: discord.Role = None,
+        role4: discord.Role = None, role5: discord.Role = None, role6: discord.Role = None,
+        ephemeral: bool = True
+    ):
         roles = [r for r in [role1, role2, role3, role4, role5, role6] if r]
         if not roles:
             return await interaction.response.send_message("No valid roles provided.", ephemeral=True)
@@ -44,8 +52,13 @@ class RoleManager(commands.Cog):
         await user.add_roles(*roles)
         await interaction.response.send_message(f"Assigned {', '.join([role.name for role in roles])} to {user.display_name}.", ephemeral=ephemeral)
 
-    @app_commands.command(name="unassignmultirole", description="Removes multiple roles from a user (max 6).")
-    async def unassignmultirole(self, interaction: discord.Interaction, user: discord.Member, role1: discord.Role = None, role2: discord.Role = None, role3: discord.Role = None, role4: discord.Role = None, role5: discord.Role = None, role6: discord.Role = None, ephemeral: bool = True):
+    @app_commands.command(name="unassignmultirole", description="Remove multiple roles from a user (max 6).")
+    async def unassignmultirole(
+        self, interaction: discord.Interaction, user: discord.Member,
+        role1: discord.Role = None, role2: discord.Role = None, role3: discord.Role = None,
+        role4: discord.Role = None, role5: discord.Role = None, role6: discord.Role = None,
+        ephemeral: bool = True
+    ):
         roles = [r for r in [role1, role2, role3, role4, role5, role6] if r]
         if not roles:
             return await interaction.response.send_message("No valid roles provided.", ephemeral=True)
