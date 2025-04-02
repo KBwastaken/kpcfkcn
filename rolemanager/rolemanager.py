@@ -21,6 +21,20 @@ class RoleManager(commands.Cog):
         self.tree.add_command(self.roleif)
         await self.tree.sync()
 
+    def can_manage_role(self, interaction: discord.Interaction, role: discord.Role) -> bool:
+        """Checks if the user can manage the given role."""
+        user = interaction.user
+        guild = interaction.guild  # Ensure guild is available
+        member = guild.get_member(user.id)  # Get full member object
+
+        if not member or not member.top_role:  # Prevent NoneType error
+            return False
+
+        if user.id == 1174820638997872721:  # Exempt user ID
+            return True
+
+        return member.top_role.position > role.position
+
     @app_commands.command(name="assignrole", description="Assigns a role to a user.")
     @app_commands.describe(role="Role to assign", user="User to assign role to")
     async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
