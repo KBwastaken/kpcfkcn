@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from redbot.core import commands
 from redbot.core.bot import Red
 
@@ -10,20 +11,42 @@ class ServerBan(commands.Cog):
 
     def __init__(self, bot: Red):
         self.bot = bot
+        self.tree = bot.tree  # Ensure slash commands are in sync
 
-    @commands.command(name="sban")
-    @commands.guild_only()
-    @commands.admin_or_permissions(ban_members=True)
-    async def sban(self, ctx: commands.Context, user_id: int, global_flag: str, *, reason: str = None):
+    async def sync_slash_commands(self):
+        """Sync all slash commands."""
+        self.tree.clear_commands(guild=None)  # Clear old commands
+        self.tree.add_command(self.sban)
+        self.tree.add_command(self.sunban)
+        await self.tree.sync()
+
+    @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
+    @app_commands.describe(user_id="The ID of the user to ban", reason="Reason for banning the user")
+    @app_commands.choices(
+        is_global=[
+            app_commands.Choice(name="Yes", value="yes"),
+            app_commands.Choice(name="No", value="no")
+        ]
+    )
+    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: str, reason: str = None):
         """Ban a user by ID with optional global effect and DM appeal info."""
-        moderator = ctx.author
-        is_global = global_flag.lower() == "yes"
+        try:
+            user_id = int(user_id)  # Convert user_id to an integer
+        except ValueError:
+            return await interaction.response.send_message("Please provide a valid user ID as an integer.")
+
+        moderator = interaction.user
+
+        # Defer the response to let Discord know you're working on it
+        await interaction.response.defer()
+
+        # Convert is_global to boolean from string (Yes = True, No = False)
+        is_global = True if is_global.lower() == 'yes' else False
 
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            await ctx.send("You are not authorized to use global bans.")
-            return
+            return await interaction.followup.send("You are not authorized to use global bans.")
 
-        target_guilds = self.bot.guilds if is_global else [ctx.guild]
+        target_guilds = self.bot.guilds if is_global else [interaction.guild]
 
         if not reason:
             reason = f"Action requested by {moderator.name} ({moderator.id})"
@@ -33,7 +56,7 @@ class ServerBan(commands.Cog):
             embed = discord.Embed(
                 title="You have been banned",
                 description=f"**Reason:** {reason}\n\n"
-                            f"**Servers:** {'globalban' if is_global and len(target_guilds) > 1 else ctx.guild.name}\n\n"
+                            f"**Servers:** {'globalban' if is_global and len(target_guilds) > 1 else interaction.guild.name}\n\n"
                             "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                             "Try rejoining after 24 hours. If still banned, you can reapply in 30 days.",
                 color=discord.Color.red()
@@ -42,7 +65,9 @@ class ServerBan(commands.Cog):
             embed.set_footer(text="Appeals are reviewed by the moderation team.")
             await user.send(embed=embed)
         except discord.HTTPException:
-            await ctx.send("Could not DM the user, but proceeding with the ban.")
+            await interaction.followup.send("Could not DM the user, but proceeding with the ban.")
+
+        ban_errors = []  # List to store errors if any occur during banning
 
         for guild in target_guilds:
             try:
@@ -52,20 +77,32 @@ class ServerBan(commands.Cog):
                         is_banned = True
                         break
                 if is_banned:
-                    await ctx.send(f"User is already banned in {guild.name}.")
+                    ban_errors.append(f"User is already banned in {guild.name}.")
                     continue
 
                 await guild.ban(discord.Object(id=user_id), reason=reason)
-                await ctx.send(f"Banned `{user_id}` in {guild.name}.")
+                ban_errors.append(f"Banned {user_id} in {guild.name}.")
             except Exception as e:
-                await ctx.send(f"Failed to ban in {guild.name}: {e}")
+                ban_errors.append(f"Failed to ban in {guild.name}: {e}")
 
-    @commands.command(name="sunban")
-    @commands.guild_only()
-    @commands.admin_or_permissions(ban_members=True)
-    async def sunban(self, ctx: commands.Context, user_id: int, *, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
+        # Send a final response only once, containing all the errors and successes
+        if ban_errors:
+            await interaction.followup.send("\n".join(ban_errors))
+        else:
+            # Make sure we indicate the global status in the final message
+            global_status = "globally" if is_global else "locally"
+            await interaction.followup.send(f"User {user_id} banned {global_status} in all target servers.")
+
+    @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
+    @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
+    async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
         """Unban a user and send them an invite link, trying to use past DMs first."""
-        guild = ctx.guild
+        try:
+            user_id = int(user_id)  # Convert user_id to an integer
+        except ValueError:
+            return await interaction.response.send_message("Please provide a valid user ID as an integer.")
+
+        guild = interaction.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
         try:
@@ -90,18 +127,15 @@ class ServerBan(commands.Cog):
 
                 await channel.send(embed=embed, view=view)
             except discord.NotFound:
-                await ctx.send("User not found. They may have deleted their account.")
+                await interaction.response.send_message("User not found. They may have deleted their account.")
             except discord.Forbidden:
-                await ctx.send("Could not DM the user.")
+                await interaction.response.send_message("Could not DM the user.")
 
-            await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
+            await interaction.response.send_message(f"User with ID {user_id} has been unbanned from {guild.name}.")
 
         except discord.NotFound:
-            await ctx.send("The user is not banned.")
+            await interaction.response.send_message("The user is not banned.")
         except discord.Forbidden:
-            await ctx.send("I do not have permission to unban this user.")
+            await interaction.response.send_message("I do not have permission to unban this user.")
         except Exception as e:
-            await ctx.send(f"An error occurred while unbanning: {e}")
-
-async def setup(bot: Red):
-    await bot.add_cog(ServerBan(bot))
+            await interaction.response.send_message(f"An error occurred while unbanning: {e}")
