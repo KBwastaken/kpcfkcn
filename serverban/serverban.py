@@ -3,7 +3,7 @@ from discord import app_commands
 from redbot.core import commands
 from redbot.core.bot import Red
 
-ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
+ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 
 class ServerBan(commands.Cog):
