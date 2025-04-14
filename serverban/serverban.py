@@ -108,6 +108,7 @@ class ServerBan(red_commands.Cog):
             except discord.HTTPException as e:
                 failed.append(f"❌ {guild.name}: {e}")
 
+        lines = []  # Ensure 'lines' is initialized
         try:
             user = await self.bot.fetch_user(user_id)
             if success:
@@ -122,12 +123,12 @@ class ServerBan(red_commands.Cog):
                 for name, url in success:
                     view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
                 await user.send(embed=embed, view=view)
+            else:
+                lines.append("❌ Failed to send DM to the user, but proceeding with the unban(s).")
         except discord.HTTPException:
-            # If DM failed, proceed with banning and notify in the server
-            lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
+            lines.append("❌ Failed to send DM to the user, but proceeding with the unban(s).")
 
         # Build the result embed for the unban process
-        lines = []
         for name, _ in success:
             lines.append(f"✅ {name}")
         for fail in failed:
@@ -162,7 +163,7 @@ class ServerBan(red_commands.Cog):
             ban_embed = discord.Embed(
                 title="You have been banned",
                 description=(f"**Reason:** {reason}\n\n**Servers:** "
-                             f"{'All Participating Servers' if is_global else interaction.guild.name}\n\n"
+                             f"{'KCN Globalban' if is_global else interaction.guild.name}\n\n"
                              "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                              "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
                 color=discord.Color.red()
@@ -172,7 +173,7 @@ class ServerBan(red_commands.Cog):
             await user.send(embed=ban_embed)
         except discord.HTTPException:
             # If DM failed, proceed with banning and notify in the server
-            lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
+            lines = ["❌ Failed to send DM to the user, but proceeding with the ban(s)."]
 
         # Continue with the ban process as usual
         results = []
@@ -196,4 +197,3 @@ class ServerBan(red_commands.Cog):
         summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
-
