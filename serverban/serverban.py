@@ -13,16 +13,17 @@ class ServerBan(commands.Cog):  # ✅ Inheriting from Red's Cog class
         self.bot = bot
         self.tree = bot.tree
 
-    async def cog_load(self):
-        # Prevent duplicate command registration
-        if not self.tree.get_command("sban"):
-            self.tree.add_command(self.sban)
-        if not self.tree.get_command("sunban"):
-            self.tree.add_command(self.sunban)
-        if not self.tree.get_command("sbanbl"):
-            self.tree.add_command(self.sbanbl)
+async def cog_load(self):
+    # Clear existing commands first to avoid duplicates
+    self.tree.clear_commands(guild=None)  # Optional: Replace with specific guild if needed
+    
+    # Register commands again
+    self.tree.add_command(self.sban)
+    self.tree.add_command(self.sunban)
+    self.tree.add_command(self.sbanbl)
 
-        await self.tree.sync()
+    # Sync the commands with Discord
+    await self.tree.sync()
 
     # --- SBAN COMMAND (unchanged) ---
     @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
