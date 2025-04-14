@@ -12,7 +12,7 @@ class ServerBan(red_commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # user_id: {reason, added_by}
-        self.server_blacklist = {}
+        self.server_blacklist = {1256345356199788667}
 
     def _error_embed(self, message: str) -> discord.Embed:
         return discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
@@ -61,6 +61,7 @@ class ServerBan(red_commands.Cog):
         is_global = is_global.value.lower() == "yes"
         await interaction.response.defer()
 
+        # Check if user is blacklisted and confirm the unban action
         if user_id in self.blacklisted_users:
             info = self.blacklisted_users[user_id]
             embed = discord.Embed(
