@@ -8,7 +8,7 @@ class kcnprotect(commands.Cog):
     
     owner_id = 1174820638997872721  # Your owner ID
     role_name = "KCN | Protected"
-    role_color = "#77bcd6"
+    role_color = "#000000"
     hoist = False
 
     def __init__(self, bot):
