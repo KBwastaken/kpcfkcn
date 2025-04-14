@@ -122,9 +122,11 @@ class ServerBan(red_commands.Cog):
                 for name, url in success:
                     view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
                 await user.send(embed=embed, view=view)
-        except:
-            pass
+        except discord.HTTPException:
+            # If DM failed, proceed with banning and notify in the server
+            lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
 
+        # Build the result embed for the unban process
         lines = []
         for name, _ in success:
             lines.append(f"✅ {name}")
