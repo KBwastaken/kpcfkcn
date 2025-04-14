@@ -14,7 +14,7 @@ class ServerBan(commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # {user_id: {"reason": ..., "added_by": ...}}
-        self.server_blacklist = set(1298444715804327967)  # set of guild ids
+        self.server_blacklist = {1298444715804327967}  # set of guild ids
 
     @commands.Cog.listener()
     async def on_ready(self):
