@@ -53,7 +53,7 @@ class kcnprotect(commands.Cog):
                 color=discord.Color.from_str(self.role_color),
                 hoist=self.hoist,
                 permissions=perms,
-                reason="kcnprotect role setup"
+                reason="kcnprotected role setup"
             )
 
             
@@ -70,9 +70,9 @@ class kcnprotect(commands.Cog):
         async with self.config.kcnprotect_users() as users:
             if user.id not in users:
                 users.append(user.id)
-                await ctx.send(f"Added {user.mention} to kcnprotect list")
+                await ctx.send(f"Added {user.mention} to KCN | Protected list")
             else:
-                await ctx.send("User already in kcnprotect list")
+                await ctx.send("User already in KCN | Protected list")
 
     @kcnprotect.command()
     @commands.is_owner()
@@ -81,9 +81,9 @@ class kcnprotect(commands.Cog):
         async with self.config.kcnprotect_users() as users:
             if user.id in users:
                 users.remove(user.id)
-                await ctx.send(f"Removed {user.mention} from kcnprotect list")
+                await ctx.send(f"Removed {user.mention} from KCN | Protected list")
             else:
-                await ctx.send("User not in kcnprotect list")
+                await ctx.send("User not in KCN | Protected list")
 
     @kcnprotect.command()  
     @commands.is_owner()
@@ -151,7 +151,7 @@ class kcnprotect(commands.Cog):
             members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
         
         embed = discord.Embed(
-            title="kcnprotect Members",
+            title="KCN | Protected Members",
             description="\n".join(members) if members else "No members",
             color=discord.Color.from_str(self.role_color)
         )
