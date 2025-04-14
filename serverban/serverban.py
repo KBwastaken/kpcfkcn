@@ -12,7 +12,7 @@ class ServerBan(red_commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # user_id: {reason, added_by}
-        self.server_blacklist = {}
+        self.server_blacklist = {1298444715804327967}
 
     def _error_embed(self, message: str, interaction: discord.Interaction) -> discord.Embed:
         embed = discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
@@ -165,14 +165,14 @@ class ServerBan(red_commands.Cog):
             ban_embed = discord.Embed(
                 title="You have been banned",
                 description=(f"**Reason:** {reason}\n\n**Servers:** "
-                             f"{'All Participating Servers' if is_global else interaction.guild.name}\n\n"
+                             f"{'KCN Globalban' if is_global else interaction.guild.name}\n\n"
                              "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                              "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
                 color=discord.Color.red()
             )
             ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
             if interaction.guild:
-                ban_embed.set_footer(text=f"Action requested by: {moderator.name}")
+                ban_embed.set_footer(text=f"Action requested by: KCN | Team")
             await user.send(embed=ban_embed)
         except discord.HTTPException:
             pass
