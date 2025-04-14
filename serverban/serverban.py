@@ -12,13 +12,17 @@ class ServerBan(red_commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # user_id: {reason, added_by}
-        self.server_blacklist = {1298444715804327967}
+        self.server_blacklist = {}
 
-    def _error_embed(self, message: str) -> discord.Embed:
-        return discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
+    def _error_embed(self, message: str, interaction: discord.Interaction) -> discord.Embed:
+        embed = discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
+        embed.set_footer(text=f"Action requested by: {interaction.user.name}")
+        return embed
 
-    def _success_embed(self, message: str) -> discord.Embed:
-        return discord.Embed(title="✅ Success", description=message, color=discord.Color.green())
+    def _success_embed(self, message: str, interaction: discord.Interaction) -> discord.Embed:
+        embed = discord.Embed(title="✅ Success", description=message, color=discord.Color.green())
+        embed.set_footer(text=f"Action requested by: {interaction.user.name}")
+        return embed
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -33,21 +37,21 @@ class ServerBan(red_commands.Cog):
         try:
             user_id = int(user_id)
         except ValueError:
-            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID.", interaction), ephemeral=True)
 
         if user_id in self.blacklisted_users:
             del self.blacklisted_users[user_id]
-            return await interaction.response.send_message(embed=self._success_embed("User removed from the Do Not Unban list."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._success_embed("User removed from the Do Not Unban list.", interaction), ephemeral=True)
 
         if not reason:
-            return await interaction.response.send_message(embed=self._error_embed("Reason required when adding a user."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("Reason required when adding a user.", interaction), ephemeral=True)
 
         self.blacklisted_users[user_id] = {
             "reason": reason,
             "added_by": str(interaction.user)
         }
 
-        return await interaction.response.send_message(embed=self._success_embed("User added to the Do Not Unban list."), ephemeral=True)
+        return await interaction.response.send_message(embed=self._success_embed("User added to the Do Not Unban list.", interaction), ephemeral=True)
 
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
@@ -56,7 +60,7 @@ class ServerBan(red_commands.Cog):
         try:
             user_id = int(user_id)
         except ValueError:
-            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID.", interaction), ephemeral=True)
 
         is_global = is_global.value.lower() == "yes"
         await interaction.response.defer()
@@ -70,6 +74,7 @@ class ServerBan(red_commands.Cog):
                              "Are you sure you want to proceed with the unban?"),
                 color=discord.Color.orange()
             )
+            embed.set_footer(text=f"Action requested by: {interaction.user.name}")
             view = discord.ui.View()
             confirm = discord.ui.Button(label="✅ Yes, Proceed", style=discord.ButtonStyle.success)
             cancel = discord.ui.Button(label="❌ No, Cancel", style=discord.ButtonStyle.danger)
@@ -78,7 +83,7 @@ class ServerBan(red_commands.Cog):
                 if i.user != interaction.user:
                     return await i.response.send_message("Not your action to confirm.", ephemeral=True)
                 await self._force_unban(user_id, interaction, reason, is_global)
-                await i.response.defer()
+                await i.response.send_message("Unban confirmed.", ephemeral=True)
 
             async def on_cancel(i):
                 if i.user != interaction.user:
@@ -115,6 +120,7 @@ class ServerBan(red_commands.Cog):
                     description=(f"**Reason:** {reason}\nClick the buttons below to rejoin:" if reason else "Click the buttons below to rejoin:"),
                     color=discord.Color.green()
                 )
+                embed.set_footer(text=f"Action requested by: {interaction.user.name}")
                 view = discord.ui.View()
                 for name, url in success:
                     view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
@@ -139,13 +145,13 @@ class ServerBan(red_commands.Cog):
         try:
             user_id = int(user_id)
         except ValueError:
-            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID.", interaction), ephemeral=True)
 
         is_global = is_global.value.lower() == "yes"
         moderator = interaction.user
 
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans.", interaction), ephemeral=True)
 
         await interaction.response.defer()
 
@@ -163,7 +169,7 @@ class ServerBan(red_commands.Cog):
                 color=discord.Color.red()
             )
             ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
-            ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
+            ban_embed.set_footer(text=f"Action requested by: {moderator.name}")
             await user.send(embed=ban_embed)
         except discord.HTTPException:
             pass
