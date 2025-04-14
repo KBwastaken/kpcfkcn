@@ -97,13 +97,24 @@ class ServerBan(commands.Cog):
 
 
     @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
-    @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
-    async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
+    @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user", is_global="Unban globally across all servers?")
+    @app_commands.choices(is_global=[
+        app_commands.Choice(name="Yes", value="yes"),
+        app_commands.Choice(name="No", value="no")
+    ])
+    async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below", is_global: str = "no"):
         """Unban a user and send them an invite link, trying to use past DMs first."""
         try:
             user_id = int(user_id)  # Convert user_id to an integer
         except ValueError:
             return await interaction.response.send_message("Please provide a valid user ID as an integer.")
+
+        # Convert is_global to boolean from string (Yes = True, No = False)
+        is_global = True if is_global.lower() == 'yes' else False
+
+        # If global unban, ensure the user is authorized to use this feature
+        if is_global and interaction.user.id not in ALLOWED_GLOBAL_IDS:
+            return await interaction.response.send_message("You are not authorized to perform global unbans.")
 
         # Check if the user is in the blacklist
         if user_id in BLACKLIST:
@@ -125,7 +136,7 @@ class ServerBan(commands.Cog):
             # Button click callbacks
             async def on_proceed_button_click(interaction: discord.Interaction):
                 # Proceed with the unban logic here
-                await self._unban_user(interaction, user_id, reason)
+                await self._unban_user(interaction, user_id, reason, is_global)
                 await interaction.response.send_message("User unbanned successfully.")
 
             async def on_cancel_button_click(interaction: discord.Interaction):
@@ -143,47 +154,50 @@ class ServerBan(commands.Cog):
             return
 
         # If not blacklisted, proceed with unbanning the user
-        await self._unban_user(interaction, user_id, reason)
+        await self._unban_user(interaction, user_id, reason, is_global)
 
-    async def _unban_user(self, interaction: discord.Interaction, user_id: int, reason: str):
-        """Unban a user and send them a link to rejoin."""
+    async def _unban_user(self, interaction: discord.Interaction, user_id: int, reason: str, is_global: bool):
+        """Unban a user and send them a link to rejoin, across all servers if global."""
         guild = interaction.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
-        try:
-            # Try to unban the user directly without iterating through the bans list
-            await guild.unban(discord.Object(id=user_id), reason=reason)
+        target_guilds = self.bot.guilds if is_global else [guild]
 
-            # If no error occurred, proceed to send DM to the user
+        for target_guild in target_guilds:
             try:
-                user = await self.bot.fetch_user(user_id)
-                channel = user.dm_channel or await user.create_dm()
+                # Force unban the user across all servers if global is True
+                await target_guild.unban(discord.Object(id=user_id), reason=reason)
 
-                embed = discord.Embed(
-                    title="You have been unbanned",
-                    description=f"**Reason:** {reason}\n\n"
-                                f"**Server:** {guild.name}\n\n"
-                                "Click the button below to rejoin the server.",
-                    color=discord.Color.green()
-                )
-                view = discord.ui.View()
-                button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
-                view.add_item(button)
+                # If no error occurred, proceed to send DM to the user
+                try:
+                    user = await self.bot.fetch_user(user_id)
+                    channel = user.dm_channel or await user.create_dm()
 
-                await channel.send(embed=embed, view=view)
+                    embed = discord.Embed(
+                        title="You have been unbanned",
+                        description=f"**Reason:** {reason}\n\n"
+                                    f"**Server:** {target_guild.name}\n\n"
+                                    "Click the button below to rejoin the server.",
+                        color=discord.Color.green()
+                    )
+                    view = discord.ui.View()
+                    button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
+                    view.add_item(button)
+
+                    await channel.send(embed=embed, view=view)
+                except discord.NotFound:
+                    await interaction.response.send_message("User not found. They may have deleted their account.")
+                except discord.Forbidden:
+                    await interaction.response.send_message("Could not DM the user.")
+
+                await interaction.response.send_message(f"User with ID {user_id} has been unbanned from {target_guild.name}.")
+
             except discord.NotFound:
-                await interaction.response.send_message("User not found. They may have deleted their account.")
+                await interaction.response.send_message(f"The user is not banned in {target_guild.name}.")
             except discord.Forbidden:
-                await interaction.response.send_message("Could not DM the user.")
-
-            await interaction.response.send_message(f"User with ID {user_id} has been unbanned from {guild.name}.")
-
-        except discord.NotFound:
-            await interaction.response.send_message("The user is not banned.")
-        except discord.Forbidden:
-            await interaction.response.send_message("I do not have permission to unban this user.")
-        except Exception as e:
-            await interaction.response.send_message(f"An error occurred while unbanning: {e}")
+                await interaction.response.send_message(f"I do not have permission to unban this user in {target_guild.name}.")
+            except Exception as e:
+                await interaction.response.send_message(f"An error occurred while unbanning in {target_guild.name}: {e}")
 
     # The blacklist command (to add/remove users to/from the list)
     @app_commands.command(name="sbanbl", description="Add or remove a user from the blacklist")
