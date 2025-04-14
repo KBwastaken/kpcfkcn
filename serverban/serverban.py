@@ -12,7 +12,7 @@ class ServerBan(red_commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # user_id: {reason, added_by}
-        self.server_blacklist = {}
+        self.server_blacklist = {1298444715804327967}
 
     def _error_embed(self, message: str) -> discord.Embed:
         return discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
@@ -27,9 +27,9 @@ class ServerBan(red_commands.Cog):
         except Exception:
             pass
 
-    @app_commands.command(name="sbanbl", description="Add or remove a user from the Do Not Unban list.")
+    @app_commands.command(name="sblban", description="Add or remove a user from the Do Not Unban list.")
     @app_commands.describe(user_id="User ID to add/remove", reason="Reason for blacklisting (if adding)")
-    async def sbanbl(self, interaction: discord.Interaction, user_id: str, reason: str = None):
+    async def sblban(self, interaction: discord.Interaction, user_id: str, reason: str = None):
         try:
             user_id = int(user_id)
         except ValueError:
@@ -51,7 +51,7 @@ class ServerBan(red_commands.Cog):
 
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
-    @app_commands.choices(is_global=[app_commands.Choice(name="Yes", value="yes"), app_commands.Choice(name="No", value="no")])
+    @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
     async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = "Your application has been accepted. You may rejoin using the invite link."):
         try:
             user_id = int(user_id)
@@ -137,7 +137,7 @@ class ServerBan(red_commands.Cog):
 
     @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
-    @app_commands.choices(is_global=[app_commands.Choice(name="Yes", value="yes"), app_commands.Choice(name="No", value="no")])
+    @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
     async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
         try:
             user_id = int(user_id)
@@ -160,7 +160,7 @@ class ServerBan(red_commands.Cog):
             ban_embed = discord.Embed(
                 title="You have been banned",
                 description=(f"**Reason:** {reason}\n\n**Servers:** "
-                             f"{'All Participating Servers' if is_global else interaction.guild.name}\n\n"
+                             f"{'KCN Globalban' if is_global else interaction.guild.name}\n\n"
                              "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                              "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
                 color=discord.Color.red()
