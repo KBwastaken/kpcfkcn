@@ -16,12 +16,14 @@ class ServerBan(red_commands.Cog):
 
     def _error_embed(self, message: str, interaction: discord.Interaction) -> discord.Embed:
         embed = discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
-        embed.set_footer(text=f"Action requested by: {interaction.user.name}")
+        if interaction.guild:
+            embed.set_footer(text=f"Action requested by: {interaction.user.name}")
         return embed
 
     def _success_embed(self, message: str, interaction: discord.Interaction) -> discord.Embed:
         embed = discord.Embed(title="✅ Success", description=message, color=discord.Color.green())
-        embed.set_footer(text=f"Action requested by: {interaction.user.name}")
+        if interaction.guild:
+            embed.set_footer(text=f"Action requested by: {interaction.user.name}")
         return embed
 
     @commands.Cog.listener()
@@ -74,7 +76,8 @@ class ServerBan(red_commands.Cog):
                              "Are you sure you want to proceed with the unban?"),
                 color=discord.Color.orange()
             )
-            embed.set_footer(text=f"Action requested by: {interaction.user.name}")
+            if interaction.guild:
+                embed.set_footer(text=f"Action requested by: {interaction.user.name}")
             view = discord.ui.View()
             confirm = discord.ui.Button(label="✅ Yes, Proceed", style=discord.ButtonStyle.success)
             cancel = discord.ui.Button(label="❌ No, Cancel", style=discord.ButtonStyle.danger)
@@ -120,7 +123,6 @@ class ServerBan(red_commands.Cog):
                     description=(f"**Reason:** {reason}\nClick the buttons below to rejoin:" if reason else "Click the buttons below to rejoin:"),
                     color=discord.Color.green()
                 )
-                embed.set_footer(text=f"Action requested by: {interaction.user.name}")
                 view = discord.ui.View()
                 for name, url in success:
                     view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
@@ -169,7 +171,8 @@ class ServerBan(red_commands.Cog):
                 color=discord.Color.red()
             )
             ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
-            ban_embed.set_footer(text=f"Action requested by: {moderator.name}")
+            if interaction.guild:
+                ban_embed.set_footer(text=f"Action requested by: {moderator.name}")
             await user.send(embed=ban_embed)
         except discord.HTTPException:
             pass
