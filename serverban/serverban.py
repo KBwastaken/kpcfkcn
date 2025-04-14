@@ -27,7 +27,7 @@ class ServerBan(commands.Cog):
                 description="You do not have permission to blacklist users.",
                 color=discord.Color.red()
             )
-            return await interaction.response.send_message(embed=embed, ephemeral=True)
+            return await interaction.response.send_message(embed=embed, ephemeral=False)
 
         try:
             user_id = int(user_id)
@@ -37,7 +37,7 @@ class ServerBan(commands.Cog):
                 description="Please provide a valid user ID as an integer.",
                 color=discord.Color.red()
             )
-            return await interaction.response.send_message(embed=embed, ephemeral=True)
+            return await interaction.response.send_message(embed=embed, ephemeral=False)
 
         if action.lower() == "add":
             if reason == "":
@@ -46,7 +46,7 @@ class ServerBan(commands.Cog):
                     description="You must provide a reason for adding a user to the blacklist.",
                     color=discord.Color.red()
                 )
-                return await interaction.response.send_message(embed=embed, ephemeral=True)
+                return await interaction.response.send_message(embed=embed, ephemeral=False)
 
             self.blacklisted_users[user_id] = {"reason": reason, "added_by": interaction.user.id}
             embed = discord.Embed(
@@ -54,7 +54,7 @@ class ServerBan(commands.Cog):
                 description=f"User with ID {user_id} has been added to the blacklist for reason: {reason}.",
                 color=discord.Color.green()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
 
         elif action.lower() == "remove":
             if user_id in self.blacklisted_users:
@@ -64,23 +64,23 @@ class ServerBan(commands.Cog):
                     description=f"User with ID {user_id} has been removed from the blacklist.",
                     color=discord.Color.green()
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=False)
             else:
                 embed = discord.Embed(
                     title="User Not Found",
                     description=f"User with ID {user_id} is not on the blacklist.",
                     color=discord.Color.red()
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=False)
         else:
             embed = discord.Embed(
                 title="Invalid Action",
                 description="Invalid action. Use 'add' or 'remove'.",
                 color=discord.Color.red()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
 
-    # Unban command (integrated with blacklist checking)
+    # Unban command (integrated with blacklist checking and global check)
     @app_commands.command(name="sunban", description="Unban a user and send them an invite link")
     @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
     async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted. You can now rejoin using the invite link."):
@@ -93,7 +93,16 @@ class ServerBan(commands.Cog):
                 description="Please provide a valid user ID as an integer.",
                 color=discord.Color.red()
             )
-            return await interaction.response.send_message(embed=embed, ephemeral=True)
+            return await interaction.response.send_message(embed=embed, ephemeral=False)
+
+        # Check if the server is blacklisted for global unbans
+        if interaction.guild.id in server_blacklist:
+            embed = discord.Embed(
+                title="Server Blacklisted",
+                description="This server has blacklisted global unbans. The user cannot be unbanned here.",
+                color=discord.Color.red()
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=False)
 
         # If the user is blacklisted, show a confirmation before unbanning
         if user_id in self.blacklisted_users:
@@ -118,12 +127,12 @@ class ServerBan(commands.Cog):
                     description="Unban action has been canceled.",
                     color=discord.Color.green()
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=False)
 
             yes_button.callback = yes_button_callback
             no_button.callback = no_button_callback
 
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
         else:
             await self._unban_user(interaction, user_id, reason)
 
@@ -157,42 +166,42 @@ class ServerBan(commands.Cog):
                     description="The user may have deleted their account.",
                     color=discord.Color.red()
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=False)
             except discord.Forbidden:
                 embed = discord.Embed(
                     title="Permission Error",
                     description="Could not DM the user. Ensure they have DMs open.",
                     color=discord.Color.red()
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=False)
 
             embed = discord.Embed(
                 title="User Unbanned",
                 description=f"User with ID {user_id} has been unbanned from {guild.name}.",
                 color=discord.Color.green()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
         except discord.NotFound:
             embed = discord.Embed(
                 title="User Not Banned",
                 description="The user is not banned.",
                 color=discord.Color.red()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
         except discord.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
                 description="I do not have permission to unban this user.",
                 color=discord.Color.red()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
                 description=f"An error occurred while unbanning: {e}",
                 color=discord.Color.red()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
 
     # Force ban (global and local ban with optional appeal messaging)
     @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
@@ -210,7 +219,7 @@ class ServerBan(commands.Cog):
                 description="Please provide a valid user ID as an integer.",
                 color=discord.Color.red()
             )
-            return await interaction.response.send_message(embed=embed, ephemeral=True)
+            return await interaction.response.send_message(embed=embed, ephemeral=False)
 
         # Defer the response to let Discord know you're working on it
         await interaction.response.defer()
@@ -224,7 +233,7 @@ class ServerBan(commands.Cog):
                 description="You are not authorized to use global bans.",
                 color=discord.Color.red()
             )
-            return await interaction.followup.send(embed=embed)
+            return await interaction.followup.send(embed=embed, ephemeral=False)
 
         target_guilds = self.bot.guilds if is_global else [interaction.guild]
 
@@ -248,7 +257,7 @@ class ServerBan(commands.Cog):
                         description=f"User with ID {user_id} has been banned from {guild.name}.",
                         color=discord.Color.green()
                     )
-                    await interaction.followup.send(embed=embed)
+                    await interaction.followup.send(embed=embed, ephemeral=False)
 
                 else:
                     embed = discord.Embed(
@@ -256,7 +265,7 @@ class ServerBan(commands.Cog):
                         description=f"User with ID {user_id} is already banned in {guild.name}.",
                         color=discord.Color.red()
                     )
-                    await interaction.followup.send(embed=embed)
+                    await interaction.followup.send(embed=embed, ephemeral=False)
 
             except Exception as e:
                 # Add to list of errors
@@ -270,5 +279,4 @@ class ServerBan(commands.Cog):
         # If there are any errors, send them as a message
         if ban_errors:
             for error_embed in ban_errors:
-                await interaction.followup.send(embed=error_embed)
-
+                await interaction.followup.send(embed=error_embed, ephemeral=False)
