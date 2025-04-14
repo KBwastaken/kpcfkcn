@@ -12,7 +12,7 @@ class ServerBan(red_commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # user_id: {reason, added_by}
-        self.server_blacklist = {1256345356199788667}
+        self.server_blacklist = {}
 
     def _error_embed(self, message: str) -> discord.Embed:
         return discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
