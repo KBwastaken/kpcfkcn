@@ -14,8 +14,7 @@ class ServerBan(commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # {user_id: {"reason": ..., "added_by": ...}}
-        self.server_blacklist = set([1298444715804327967]) 
-
+        self.server_blacklist = set[(1256345356199788667)]  # set of guild ids
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -44,7 +43,6 @@ class ServerBan(commands.Cog):
         ]
     )
     async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
-        """Ban a user with an optional global effect and DM appeal."""
         try:
             user_id = int(user_id)
         except ValueError:
@@ -80,7 +78,12 @@ class ServerBan(commands.Cog):
                 results.append(f"❌ `{guild.name}`: Server is blacklisted.")
                 continue
             try:
-                is_banned = any(entry.user.id == user_id async for entry in guild.bans())
+                is_banned = False
+                async for entry in guild.bans():  # Correct way to iterate over async_generator
+                    if entry.user.id == user_id:
+                        is_banned = True
+                        break
+                
                 if not is_banned:
                     await guild.ban(discord.Object(id=user_id), reason=reason)
                     results.append(f"✅ `{guild.name}`")
@@ -102,7 +105,6 @@ class ServerBan(commands.Cog):
         ]
     )
     async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = "Your application has been accepted. You may rejoin using the invite link."):
-        """Unban a user by ID with global effect and send them an invite link."""
         try:
             user_id = int(user_id)
         except ValueError:
@@ -182,7 +184,6 @@ class ServerBan(commands.Cog):
         app_commands.Choice(name="Remove", value="remove")
     ])
     async def sbanbl(self, interaction: discord.Interaction, user_id: str, action: app_commands.Choice[str], reason: str = None):
-        """Add or remove users from the blacklist."""
         try:
             user_id = int(user_id)
         except ValueError:
@@ -200,4 +201,4 @@ class ServerBan(commands.Cog):
                 del self.blacklisted_users[user_id]
                 await interaction.response.send_message(embed=self._success_embed(f"User `{user_id}` removed from Do Not Unban list."))
             else:
-                await interaction.response.send_message(embed=self._error_embed(f"User `{user_id}` is not in the blacklist."), ephemeral=True)
+                await interaction.response.send_message(embed=self._error_embed("User not found in blacklist."), ephemeral=True)
