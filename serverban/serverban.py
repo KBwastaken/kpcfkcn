@@ -138,68 +138,68 @@ class ServerBan(red_commands.Cog):
         result.set_footer(text=f"Requested by {interaction.user.display_name}")
         await interaction.followup.send(embed=result)
 
-@app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
-@app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
-@app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
-async def sban(self, interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
-    try:
-        user_id = int(user_id)
-    except ValueError:
-        return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
-
-    is_global = is_global.value.lower() == "yes"
-    moderator = interaction.user
-
-    if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-        return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=True)
-
-    await interaction.response.defer()
-
-    if not reason:
-        reason = f"Action requested by {moderator.name} ({moderator.id})"
-
-    lines = []  # Ensure 'lines' is initialized here for logging ban results
-
-    try:
-        user = await self.bot.fetch_user(user_id)
-        ban_embed = discord.Embed(
-            title="You have been banned",
-            description=(f"**Reason:** {reason}\n\n**Servers:** "
-                         f"{'KCN Globalban' if is_global else interaction.guild.name}\n\n"
-                         "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
-                         "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
-            color=discord.Color.red()
-        )
-        ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
-        ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
-        await user.send(embed=ban_embed)
-    except discord.HTTPException:
-        # If DM failed, log the failure and continue banning the user
-        lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
-
-    # Continue with the ban process as usual
-    results = []
-    guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
-
-    for guild in guilds:
+    @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
+    @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
+    @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
+    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
         try:
-            is_banned = False
-            async for entry in guild.bans():
-                if entry.user.id == user_id:
-                    is_banned = True
-                    break
-            if not is_banned:
-                await guild.ban(discord.Object(id=user_id), reason=reason)
-                results.append(f"✅ {guild.name}")
-            else:
-                results.append(f"⚠️ {guild.name}: Already banned")
-        except Exception as e:
-            results.append(f"❌ {guild.name}: {e}")
+            user_id = int(user_id)
+        except ValueError:
+            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
 
-    # Add results to lines
-    for res in results:
-        lines.append(res)
+        is_global = is_global.value.lower() == "yes"
+        moderator = interaction.user
 
-    summary = discord.Embed(title="Ban Results", description="\n".join(lines), color=discord.Color.orange())
-    summary.set_footer(text=f"Requested by {moderator}")
-    await interaction.followup.send(embed=summary)
+        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
+            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=True)
+
+        await interaction.response.defer()
+
+        if not reason:
+            reason = f"Action requested by {moderator.name} ({moderator.id})"
+
+        lines = []  # Ensure 'lines' is initialized here for logging ban results
+
+        try:
+            user = await self.bot.fetch_user(user_id)
+            ban_embed = discord.Embed(
+                title="You have been banned",
+                description=(f"**Reason:** {reason}\n\n**Servers:** "
+                             f"{'KCN Globalban' if is_global else interaction.guild.name}\n\n"
+                             "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
+                             "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
+                color=discord.Color.red()
+            )
+            ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
+            ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
+            await user.send(embed=ban_embed)
+        except discord.HTTPException:
+            # If DM failed, log the failure and continue banning the user
+            lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
+
+        # Continue with the ban process as usual
+        results = []
+        guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
+
+        for guild in guilds:
+            try:
+                is_banned = False
+                async for entry in guild.bans():
+                    if entry.user.id == user_id:
+                        is_banned = True
+                        break
+                if not is_banned:
+                    await guild.ban(discord.Object(id=user_id), reason=reason)
+                    results.append(f"✅ {guild.name}")
+                else:
+                    results.append(f"⚠️ {guild.name}: Already banned")
+            except Exception as e:
+                results.append(f"❌ {guild.name}: {e}")
+
+        # Add results to lines
+        for res in results:
+            lines.append(res)
+
+        summary = discord.Embed(title="Ban Results", description="\n".join(lines), color=discord.Color.orange())
+        summary.set_footer(text=f"Requested by {moderator}")
+        await interaction.followup.send(embed=summary)
