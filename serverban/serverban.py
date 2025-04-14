@@ -27,9 +27,9 @@ class ServerBan(red_commands.Cog):
         except Exception:
             pass
 
-    @app_commands.command(name="sblban", description="Add or remove a user from the Do Not Unban list.")
+    @app_commands.command(name="sbanbl", description="Add or remove a user from the Do Not Unban list.")
     @app_commands.describe(user_id="User ID to add/remove", reason="Reason for blacklisting (if adding)")
-    async def sblban(self, interaction: discord.Interaction, user_id: str, reason: str = None):
+    async def sbanbl(self, interaction: discord.Interaction, user_id: str, reason: str = None):
         try:
             user_id = int(user_id)
         except ValueError:
