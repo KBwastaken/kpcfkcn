@@ -117,7 +117,8 @@ class ServerBan(red_commands.Cog):
                 )
                 view = discord.ui.View()
                 for name, url in success:
-                    view.add_item(discord.ui.Button(label=name[:80], url=url))
+                    embed.add_field(name=name, value=url, inline=False)
+                    view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
                 await user.send(embed=embed, view=view)
         except:
             pass
@@ -189,3 +190,4 @@ class ServerBan(red_commands.Cog):
         summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
+
