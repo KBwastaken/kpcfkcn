@@ -1,11 +1,12 @@
 import discord
 from discord import app_commands
-from discord.ext import commands as ext_commands
 from redbot.core import commands
 from redbot.core.bot import Red
 
+# Set of allowed global user IDs for certain commands
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380}
-APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
+# Set of guild IDs where the user is blacklisted
+server_blacklist = {1298444715804327967}
 
 class ServerBan(commands.Cog):
     """Force-ban or unban users by ID with global option, appeal messaging, and blacklist control."""
@@ -14,186 +15,260 @@ class ServerBan(commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}  # {user_id: {"reason": ..., "added_by": ...}}
-        self.server_blacklist = {1298444715804327967}  # set of guild ids
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        await self.tree.sync()
-
-    def _error_embed(self, message: str):
-        return discord.Embed(
-            title="Error",
-            description=message,
-            color=discord.Color.red()
-        )
-
-    def _success_embed(self, message: str):
-        return discord.Embed(
-            title="Success",
-            description=message,
-            color=discord.Color.green()
-        )
-
-    @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
-    @app_commands.describe(user_id="The ID of the user to ban", reason="Reason for banning the user", is_global="Should this ban be global?")
-    @app_commands.choices(
-        is_global=[
-            app_commands.Choice(name="Yes", value="yes"),
-            app_commands.Choice(name="No", value="no")
-        ]
-    )
-    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
-
-        moderator = interaction.user
-        is_global = is_global.value.lower() == "yes"
-
-        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=True)
-
-        await interaction.response.defer()
-
-        if not reason:
-            reason = f"Action requested by {moderator.name} ({moderator.id})"
-
-        try:
-            user = await self.bot.fetch_user(user_id)
+    # Command to add or remove users from the blacklist
+    @app_commands.command(name="sbanbl", description="Add or remove users from the blacklist")
+    @app_commands.describe(user_id="The ID of the user to blacklist", action="Whether to add or remove the user from the blacklist")
+    async def sbanbl(self, interaction: discord.Interaction, user_id: str, action: str, reason: str = ""):
+        """Add or remove users from the blacklist."""
+        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             embed = discord.Embed(
-                title="You have been banned",
-                description=f"**Reason:** {reason}\n\n**Servers:** {'All Participating Servers' if is_global else interaction.guild.name}\n\nYou may appeal using the link below. Appeals will be reviewed within 12 hours.\nTry rejoining after 24 hours. If still banned, you can reapply in 30 days.",
+                title="Permission Denied",
+                description="You do not have permission to blacklist users.",
                 color=discord.Color.red()
             )
-            embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
-            embed.set_footer(text="Appeals are reviewed by the moderation team.")
-            await user.send(embed=embed)
-        except discord.HTTPException:
-            pass
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        results = []
-        for guild in self.bot.guilds if is_global else [interaction.guild]:
-            if guild.id in self.server_blacklist:
-                results.append(f"❌ `{guild.name}`: Server is blacklisted.")
-                continue
-            try:
-                is_banned = any(entry.user.id == user_id async for entry in guild.bans())
-                if not is_banned:
-                    await guild.ban(discord.Object(id=user_id), reason=reason)
-                    results.append(f"✅ `{guild.name}`")
-                else:
-                    results.append(f"⚠️ `{guild.name}`: Already banned")
-            except Exception as e:
-                results.append(f"❌ `{guild.name}`: {e}")
-
-        summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
-        summary.set_footer(text=f"Requested by {moderator}")
-        await interaction.followup.send(embed=summary)
-
-    @app_commands.command(name="sunban", description="Unban a user by ID and send them invite links.")
-    @app_commands.describe(user_id="The ID of the user to unban", is_global="Should this unban be global?", reason="Reason for unbanning the user")
-    @app_commands.choices(
-        is_global=[
-            app_commands.Choice(name="Yes", value="yes"),
-            app_commands.Choice(name="No", value="no")
-        ]
-    )
-    async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = "Your application has been accepted. You may rejoin using the invite link."):
         try:
             user_id = int(user_id)
         except ValueError:
-            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
-
-        is_global = is_global.value.lower() == "yes"
-        moderator = interaction.user
-        await interaction.response.defer()
-
-        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.followup.send(embed=self._error_embed("You are not authorized to perform global unbans."), ephemeral=True)
-
-        if user_id in self.blacklisted_users:
-            # Blacklisted, need confirmation
-            blacklisted_info = self.blacklisted_users[user_id]
-            confirm_embed = discord.Embed(
-                title="User is Blacklisted",
-                description=f"This user is on the Do Not Unban list for reason: {blacklisted_info['reason']}. Are you sure you want to proceed with the unban?",
-                color=discord.Color.orange()
+            embed = discord.Embed(
+                title="Invalid ID",
+                description="Please provide a valid user ID as an integer.",
+                color=discord.Color.red()
             )
-            view = discord.ui.View()
-            confirm_button = discord.ui.Button(label="Yes, Proceed", style=discord.ButtonStyle.green)
-            cancel_button = discord.ui.Button(label="No, Cancel", style=discord.ButtonStyle.red)
-            view.add_item(confirm_button)
-            view.add_item(cancel_button)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-            async def on_confirm(interaction: discord.Interaction):
-                await self._unban_user(user_id, interaction, reason)
+        if action.lower() == "add":
+            if reason == "":
+                embed = discord.Embed(
+                    title="Missing Reason",
+                    description="You must provide a reason for adding a user to the blacklist.",
+                    color=discord.Color.red()
+                )
+                return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-            confirm_button.callback = on_confirm
-            cancel_button.callback = lambda interaction: interaction.response.send_message(embed=self._error_embed("Unban canceled."), ephemeral=True)
-            
-            return await interaction.followup.send(embed=confirm_embed, view=view)
+            self.blacklisted_users[user_id] = {"reason": reason, "added_by": interaction.user.id}
+            embed = discord.Embed(
+                title="User Added to Blacklist",
+                description=f"User with ID {user_id} has been added to the blacklist for reason: {reason}.",
+                color=discord.Color.green()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        if not is_global:
-            guild = interaction.guild
-            try:
-                await guild.unban(discord.Object(id=user_id), reason=reason)
-                invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
-                user = await self.bot.fetch_user(user_id)
-                embed = discord.Embed(title="You have been unbanned", description=f"**Server:** {guild.name}\n**Reason:** {reason}", color=discord.Color.green())
-                view = discord.ui.View()
-                view.add_item(discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link))
-                await user.send(embed=embed, view=view)
-                return await interaction.followup.send(embed=self._success_embed(f"User `{user_id}` unbanned and invited to {guild.name}."))
-            except Exception as e:
-                return await interaction.followup.send(embed=self._error_embed(f"Error: {e}"))
-
-        else:
-            allowed_guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist]
-            success_guilds = []
-            view = discord.ui.View()
-
-            for guild in allowed_guilds:
-                try:
-                    await guild.unban(discord.Object(id=user_id), reason=reason)
-                    invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
-                    view.add_item(discord.ui.Button(label=guild.name, url=invite.url, style=discord.ButtonStyle.link))
-                    success_guilds.append(guild.name)
-                except Exception:
-                    continue
-
-            try:
-                user = await self.bot.fetch_user(user_id)
-                embed = discord.Embed(title="You have been unbanned from multiple servers", description=f"**Reason:** {reason}\nClick the buttons below to rejoin:", color=discord.Color.green())
-                await user.send(embed=embed, view=view)
-            except Exception:
-                pass
-
-            embed = discord.Embed(title="Global Unban Complete", description=f"Unbanned from: {', '.join(success_guilds)}", color=discord.Color.green())
-            await interaction.followup.send(embed=embed)
-
-    @app_commands.command(name="sbanbl", description="Add or remove a user from the Do Not Unban blacklist.")
-    @app_commands.describe(user_id="User ID to modify", action="Add or remove", reason="Reason if adding")
-    @app_commands.choices(action=[
-        app_commands.Choice(name="Add", value="add"),
-        app_commands.Choice(name="Remove", value="remove")
-    ])
-    async def sbanbl(self, interaction: discord.Interaction, user_id: str, action: app_commands.Choice[str], reason: str = None):
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
-
-        if action.value == "add":
-            if not reason:
-                return await interaction.response.send_message(embed=self._error_embed("Reason required when adding."), ephemeral=True)
-            self.blacklisted_users[user_id] = {"reason": reason, "added_by": f"{interaction.user} ({interaction.user.id})"}
-            embed = discord.Embed(title="Blacklist Updated", description=f"User `{user_id}` added to Do Not Unban list.", color=discord.Color.red())
-            embed.add_field(name="Reason", value=reason)
-            await interaction.response.send_message(embed=embed)
-        else:
+        elif action.lower() == "remove":
             if user_id in self.blacklisted_users:
                 del self.blacklisted_users[user_id]
-                await interaction.response.send_message(embed=self._success_embed(f"User `{user_id}` removed from Do Not Unban list."))
+                embed = discord.Embed(
+                    title="User Removed from Blacklist",
+                    description=f"User with ID {user_id} has been removed from the blacklist.",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
             else:
-                await interaction.response.send_message(embed=self._error_embed("User not found in the blacklist."), ephemeral=True)
+                embed = discord.Embed(
+                    title="User Not Found",
+                    description=f"User with ID {user_id} is not on the blacklist.",
+                    color=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            embed = discord.Embed(
+                title="Invalid Action",
+                description="Invalid action. Use 'add' or 'remove'.",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # Unban command (integrated with blacklist checking)
+    @app_commands.command(name="sunban", description="Unban a user and send them an invite link")
+    @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
+    async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted. You can now rejoin using the invite link."):
+        """Unban a user and send them an invite link."""
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            embed = discord.Embed(
+                title="Invalid ID",
+                description="Please provide a valid user ID as an integer.",
+                color=discord.Color.red()
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # If the user is blacklisted, show a confirmation before unbanning
+        if user_id in self.blacklisted_users:
+            blacklist_entry = self.blacklisted_users[user_id]
+            embed = discord.Embed(
+                title="Do Not Unban - User Blacklisted",
+                description=f"This user is on the Do Not Unban list for reason: {blacklist_entry['reason']}\nAre you sure you want to proceed?",
+                color=discord.Color.red()
+            )
+            view = discord.ui.View()
+            yes_button = discord.ui.Button(label="Yes, Unban", style=discord.ButtonStyle.green)
+            no_button = discord.ui.Button(label="No, Cancel", style=discord.ButtonStyle.red)
+            view.add_item(yes_button)
+            view.add_item(no_button)
+
+            async def yes_button_callback(interaction: discord.Interaction):
+                await self._unban_user(interaction, user_id, reason)
+
+            async def no_button_callback(interaction: discord.Interaction):
+                embed = discord.Embed(
+                    title="Action Cancelled",
+                    description="Unban action has been canceled.",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            yes_button.callback = yes_button_callback
+            no_button.callback = no_button_callback
+
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        else:
+            await self._unban_user(interaction, user_id, reason)
+
+    async def _unban_user(self, interaction: discord.Interaction, user_id: int, reason: str):
+        """Helper function to unban the user and send them an invite link."""
+        guild = interaction.guild
+        invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
+
+        try:
+            # Try to unban the user
+            await guild.unban(discord.Object(id=user_id), reason=reason)
+
+            # If no error occurred, proceed to send DM to the user
+            try:
+                user = await self.bot.fetch_user(user_id)
+                channel = user.dm_channel or await user.create_dm()
+
+                embed = discord.Embed(
+                    title="You have been unbanned",
+                    description=f"**Reason:** {reason}\n\n**Server:** {guild.name}\n\nClick the button below to rejoin the server.",
+                    color=discord.Color.green()
+                )
+                view = discord.ui.View()
+                button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
+                view.add_item(button)
+
+                await channel.send(embed=embed, view=view)
+            except discord.NotFound:
+                embed = discord.Embed(
+                    title="User Not Found",
+                    description="The user may have deleted their account.",
+                    color=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            except discord.Forbidden:
+                embed = discord.Embed(
+                    title="Permission Error",
+                    description="Could not DM the user. Ensure they have DMs open.",
+                    color=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            embed = discord.Embed(
+                title="User Unbanned",
+                description=f"User with ID {user_id} has been unbanned from {guild.name}.",
+                color=discord.Color.green()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except discord.NotFound:
+            embed = discord.Embed(
+                title="User Not Banned",
+                description="The user is not banned.",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except discord.Forbidden:
+            embed = discord.Embed(
+                title="Permission Error",
+                description="I do not have permission to unban this user.",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            embed = discord.Embed(
+                title="Error",
+                description=f"An error occurred while unbanning: {e}",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # Force ban (global and local ban with optional appeal messaging)
+    @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
+    @app_commands.describe(user_id="The ID of the user to ban", reason="Reason for banning the user")
+    @app_commands.choices(
+        is_global=[app_commands.Choice(name="Yes", value="yes"), app_commands.Choice(name="No", value="no")]
+    )
+    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: str, reason: str = None):
+        """Ban a user by ID with optional global effect and DM appeal info."""
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            embed = discord.Embed(
+                title="Invalid ID",
+                description="Please provide a valid user ID as an integer.",
+                color=discord.Color.red()
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # Defer the response to let Discord know you're working on it
+        await interaction.response.defer()
+
+        # Convert is_global to boolean from string (Yes = True, No = False)
+        is_global = True if is_global.lower() == 'yes' else False
+
+        if is_global and interaction.user.id not in ALLOWED_GLOBAL_IDS:
+            embed = discord.Embed(
+                title="Permission Denied",
+                description="You are not authorized to use global bans.",
+                color=discord.Color.red()
+            )
+            return await interaction.followup.send(embed=embed)
+
+        target_guilds = self.bot.guilds if is_global else [interaction.guild]
+
+        if not reason:
+            reason = f"Action requested by {interaction.user.name} ({interaction.user.id})"
+
+        ban_errors = []  # List to store errors if any occur during banning
+
+        for guild in target_guilds:
+            try:
+                is_banned = False
+                async for entry in guild.bans():
+                    if entry.user.id == user_id:
+                        is_banned = True
+                        break
+                
+                if not is_banned:
+                    await guild.ban(discord.Object(id=user_id), reason=reason)
+                    embed = discord.Embed(
+                        title="User Banned",
+                        description=f"User with ID {user_id} has been banned from {guild.name}.",
+                        color=discord.Color.green()
+                    )
+                    await interaction.followup.send(embed=embed)
+
+                else:
+                    embed = discord.Embed(
+                        title="User Already Banned",
+                        description=f"User with ID {user_id} is already banned in {guild.name}.",
+                        color=discord.Color.red()
+                    )
+                    await interaction.followup.send(embed=embed)
+
+            except Exception as e:
+                # Add to list of errors
+                embed = discord.Embed(
+                    title="Error",
+                    description=f"An error occurred while banning the user from {guild.name}: {e}",
+                    color=discord.Color.red()
+                )
+                ban_errors.append(embed)
+
+        # If there are any errors, send them as a message
+        if ban_errors:
+            for error_embed in ban_errors:
+                await interaction.followup.send(embed=error_embed)
+
