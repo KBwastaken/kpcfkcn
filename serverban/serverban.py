@@ -93,45 +93,44 @@ class ServerBan(red_commands.Cog):
 
         await self._force_unban(user_id, interaction, reason, is_global)
 
-async def _force_unban(self, user_id: int, interaction: discord.Interaction, reason: str, is_global: bool):
-    guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
-    success, failed = [], []
+    async def _force_unban(self, user_id: int, interaction: discord.Interaction, reason: str, is_global: bool):
+        guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
+        success, failed = [], []
 
-    for guild in guilds:
+        for guild in guilds:
+            try:
+                await guild.unban(discord.Object(id=user_id), reason=reason)
+                invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
+                success.append((guild.name, invite.url))
+            except discord.Forbidden as e:
+                failed.append(f"❌ {guild.name}: {e}")
+            except discord.HTTPException as e:
+                failed.append(f"❌ {guild.name}: {e}")
+
         try:
-            await guild.unban(discord.Object(id=user_id), reason=reason)
-            invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
-            success.append((guild.name, invite.url))
-        except discord.Forbidden as e:
-            failed.append(f"❌ {guild.name}: {e}")
-        except discord.HTTPException as e:
-            failed.append(f"❌ {guild.name}: {e}")
+            user = await self.bot.fetch_user(user_id)
+            if success:
+                embed = discord.Embed(
+                    title="You have been unbanned from multiple servers",
+                    description=(f"**Reason:** {reason}\nClick the buttons below to rejoin:" if reason else "Click the buttons below to rejoin:"),
+                    color=discord.Color.green()
+                )
+                view = discord.ui.View()
+                for name, url in success:
+                    view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
+                await user.send(embed=embed, view=view)
+        except:
+            pass
 
-    try:
-        user = await self.bot.fetch_user(user_id)
-        if success:
-            embed = discord.Embed(
-                title="You have been unbanned from multiple servers",
-                description=(f"**Reason:** {reason}\nClick the buttons below to rejoin:" if reason else "Click the buttons below to rejoin:"),
-                color=discord.Color.green()
-            )
-            view = discord.ui.View()
-            for name, url in success:
-                view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
-            await user.send(embed=embed, view=view)
-    except:
-        pass
+        lines = []
+        for name, _ in success:
+            lines.append(f"✅ {name}")
+        for fail in failed:
+            lines.append(fail)
 
-    # Result message for the moderator
-    lines = []
-    for name, _ in success:
-        lines.append(f"✅ {name}")
-    for fail in failed:
-        lines.append(fail)
-
-    result = discord.Embed(title="Unban Results", description="\n".join(lines), color=discord.Color.orange())
-    result.set_footer(text=f"Requested by {interaction.user.display_name}")
-    await interaction.followup.send(embed=result)
+        result = discord.Embed(title="Unban Results", description="\n".join(lines), color=discord.Color.orange())
+        result.set_footer(text=f"Requested by {interaction.user.display_name}")
+        await interaction.followup.send(embed=result)
 
     @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
@@ -190,4 +189,3 @@ async def _force_unban(self, user_id: int, interaction: discord.Interaction, rea
         summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
-
