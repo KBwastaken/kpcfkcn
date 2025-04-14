@@ -203,4 +203,3 @@ async def sban(self, interaction: discord.Interaction, user_id: str, is_global: 
     summary = discord.Embed(title="Ban Results", description="\n".join(lines), color=discord.Color.orange())
     summary.set_footer(text=f"Requested by {moderator}")
     await interaction.followup.send(embed=summary)
-
