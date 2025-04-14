@@ -16,11 +16,8 @@ class ServerBan(commands.Cog):
 
     async def sync_slash_commands(self):
         """Sync all slash commands, ensuring no duplicates."""
-        self.tree.clear_commands(guild=None)  # Clear old commands
-        self.tree.add_command(self.sban)
-        self.tree.add_command(self.sunban)
-        self.tree.add_command(self.sbanbl)
-        await self.tree.sync()  # Sync the commands with Discord
+        # Clear old commands and re-sync
+        await self.tree.sync()  # No need to clear commands manually; syncing takes care of it
 
     async def cog_load(self):
         # Sync commands on cog load
