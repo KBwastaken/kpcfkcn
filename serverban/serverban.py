@@ -141,7 +141,7 @@ class ServerBan(red_commands.Cog):
 @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
 @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
 @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
-async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
+async def sban(self, interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
     try:
         user_id = int(user_id)
     except ValueError:
