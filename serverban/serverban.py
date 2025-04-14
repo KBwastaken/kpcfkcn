@@ -8,15 +8,13 @@ APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 blacklist = {}  # user_id: reason
 
 
-class ServerBan(commands.Cog):
-    """Ban, unban, and blacklist users with global support and forced DM messaging."""
-
+class ServerBan(commands.Cog):  # ✅ Inheriting correctly now
     def __init__(self, bot: Red):
         self.bot = bot
         self.tree = bot.tree
 
-    async def sync_slash_commands(self):
-        self.tree.clear_commands(guild=None)
+    async def cog_load(self):
+        # ✅ Proper lifecycle method to register slash commands
         self.tree.add_command(self.sban)
         self.tree.add_command(self.sunban)
         self.tree.add_command(self.sbanbl)
