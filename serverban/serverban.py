@@ -1,6 +1,6 @@
 import discord
-from discord.ext import commands
 from discord import app_commands
+from redbot.core import commands  # ✅ THIS is the correct Cog source
 from redbot.core.bot import Red
 
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380}
@@ -8,13 +8,12 @@ APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 blacklist = {}  # user_id: reason
 
 
-class ServerBan(commands.Cog):  # ✅ Inheriting correctly now
+class ServerBan(commands.Cog):  # ✅ Inheriting from Red's Cog class
     def __init__(self, bot: Red):
         self.bot = bot
         self.tree = bot.tree
 
     async def cog_load(self):
-        # ✅ Proper lifecycle method to register slash commands
         self.tree.add_command(self.sban)
         self.tree.add_command(self.sunban)
         self.tree.add_command(self.sbanbl)
