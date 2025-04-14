@@ -14,9 +14,14 @@ class ServerBan(commands.Cog):  # ✅ Inheriting from Red's Cog class
         self.tree = bot.tree
 
     async def cog_load(self):
-        self.tree.add_command(self.sban)
-        self.tree.add_command(self.sunban)
-        self.tree.add_command(self.sbanbl)
+        # Prevent duplicate command registration
+        if not self.tree.get_command("sban"):
+            self.tree.add_command(self.sban)
+        if not self.tree.get_command("sunban"):
+            self.tree.add_command(self.sunban)
+        if not self.tree.get_command("sbanbl"):
+            self.tree.add_command(self.sbanbl)
+
         await self.tree.sync()
 
     # --- SBAN COMMAND (unchanged) ---
