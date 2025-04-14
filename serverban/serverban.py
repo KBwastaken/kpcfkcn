@@ -162,7 +162,7 @@ class ServerBan(red_commands.Cog):
             ban_embed = discord.Embed(
                 title="You have been banned",
                 description=(f"**Reason:** {reason}\n\n**Servers:** "
-                             f"{'KCN Globalban' if is_global else interaction.guild.name}\n\n"
+                             f"{'All Participating Servers' if is_global else interaction.guild.name}\n\n"
                              "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                              "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
                 color=discord.Color.red()
@@ -171,8 +171,10 @@ class ServerBan(red_commands.Cog):
             ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
             await user.send(embed=ban_embed)
         except discord.HTTPException:
-            pass
+            # If DM failed, proceed with banning and notify in the server
+            lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
 
+        # Continue with the ban process as usual
         results = []
         guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
 
@@ -194,3 +196,4 @@ class ServerBan(red_commands.Cog):
         summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
+
