@@ -30,7 +30,7 @@ class ServerBan(red_commands.Cog):
     @app_commands.command(name="sbanbl", description="Add or remove a user from the Do Not Unban list.")
     @app_commands.describe(user_id="User ID to add/remove", reason="Reason for blacklisting (if adding)")
     async def sbanbl(self, interaction: discord.Interaction, user_id: str, reason: str = None):
-        if user_id not in self.blacklisted_users:
+        if user_id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(embed=self._error_embed("You are not authorized to perform this action."), ephemeral=True)
 
         try:
