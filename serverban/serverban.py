@@ -204,12 +204,4 @@ class ServerBan(red_commands.Cog):
         summary = discord.Embed(title="Ban Results", description="\n".join(lines), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
-
-    @sunban.error
-    @sban.error
-    async def on_command_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, app_commands.errors.MissingPermissions):
-            await interaction.response.send_message(
-                embed=self._error_embed("You lack the `Ban Members` permission to use this command."),
-                ephemeral=True
-            )
+        
