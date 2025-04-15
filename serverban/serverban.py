@@ -52,6 +52,7 @@ class ServerBan(red_commands.Cog):
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
     @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
+    @app_commands.checks.has_permissions(ban_members=True)
     async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = "Your application has been accepted. You may rejoin using the invite link."):
         try:
             user_id = int(user_id)
@@ -61,7 +62,6 @@ class ServerBan(red_commands.Cog):
         is_global = is_global.value.lower() == "yes"
         await interaction.response.defer()
 
-        # Check if user is blacklisted and confirm the unban action
         if user_id in self.blacklisted_users:
             info = self.blacklisted_users[user_id]
             embed = discord.Embed(
@@ -138,6 +138,7 @@ class ServerBan(red_commands.Cog):
     @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
     @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
+    @app_commands.checks.has_permissions(ban_members=True)
     async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
         try:
             user_id = int(user_id)
@@ -192,3 +193,12 @@ class ServerBan(red_commands.Cog):
         summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
+
+    @sunban.error
+    @sban.error
+    async def on_command_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, app_commands.errors.MissingPermissions):
+            await interaction.response.send_message(
+                embed=self._error_embed("You lack the `Ban Members` permission to use this command."),
+                ephemeral=True
+            )
