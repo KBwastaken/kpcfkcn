@@ -84,7 +84,7 @@ class ServerBan(red_commands.Cog):
             async def on_cancel(i):
                 if i.user != interaction.user:
                     return await i.response.send_message("Not your action to cancel.", ephemeral=True)
-                await i.response.send_message("Unban canceled.", ephemeral=True)
+                await i.response.send_message("Unban cancelled by {interactionUser.user.username}.", ephemeral=False)
 
             confirm.callback = on_confirm
             cancel.callback = on_cancel
@@ -108,6 +108,7 @@ class ServerBan(red_commands.Cog):
             except discord.HTTPException as e:
                 failed.append(f"❌ {guild.name}: {e}")
 
+        lines = []  # Ensure 'lines' is initialized
         try:
             user = await self.bot.fetch_user(user_id)
             if success:
@@ -122,10 +123,12 @@ class ServerBan(red_commands.Cog):
                 for name, url in success:
                     view.add_item(discord.ui.Button(label=f"Rejoin {name[:20]}", url=url))
                 await user.send(embed=embed, view=view)
-        except:
-            pass
+            else:
+                lines.append("❌ Failed to send DM to the user, but proceeding with the unban(s).")
+        except discord.HTTPException:
+            lines.append("❌ Failed to send DM to the user, but proceeding with the unban(s).")
 
-        lines = []
+        # Build the result embed for the unban process
         for name, _ in success:
             lines.append(f"✅ {name}")
         for fail in failed:
@@ -149,12 +152,14 @@ class ServerBan(red_commands.Cog):
         moderator = interaction.user
 
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=False)
 
         await interaction.response.defer()
 
         if not reason:
             reason = f"Action requested by {moderator.name} ({moderator.id})"
+
+        lines = []  # Ensure 'lines' is initialized here for logging ban results
 
         try:
             user = await self.bot.fetch_user(user_id)
@@ -170,8 +175,10 @@ class ServerBan(red_commands.Cog):
             ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
             await user.send(embed=ban_embed)
         except discord.HTTPException:
-            pass
+            # If DM failed, log the failure and continue banning the user
+            lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
 
+        # Continue with the ban process as usual
         results = []
         guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
 
@@ -190,7 +197,11 @@ class ServerBan(red_commands.Cog):
             except Exception as e:
                 results.append(f"❌ {guild.name}: {e}")
 
-        summary = discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange())
+        # Add results to lines
+        for res in results:
+            lines.append(res)
+
+        summary = discord.Embed(title="Ban Results", description="\n".join(lines), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
 
