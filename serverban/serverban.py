@@ -84,7 +84,7 @@ class ServerBan(red_commands.Cog):
             async def on_cancel(i):
                 if i.user != interaction.user:
                     return await i.response.send_message("Not your action to cancel.", ephemeral=True)
-                await i.response.send_message("Unban cancelled by {moderator}.", ephemeral=False)
+                await i.response.send_message("Unban cancelled by {interactionUser.user.username}.", ephemeral=False)
 
             confirm.callback = on_confirm
             cancel.callback = on_cancel
