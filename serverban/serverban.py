@@ -84,7 +84,7 @@ class ServerBan(red_commands.Cog):
             async def on_cancel(i):
                 if i.user != interaction.user:
                     return await i.response.send_message("Not your action to cancel.", ephemeral=True)
-                await i.response.send_message("Unban canceled.", ephemeral=True)
+                await i.response.send_message("Unban cancelled by {moderator}.", ephemeral=False)
 
             confirm.callback = on_confirm
             cancel.callback = on_cancel
@@ -151,7 +151,7 @@ class ServerBan(red_commands.Cog):
         moderator = interaction.user
 
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=True)
+            return await interaction.response.send_message(embed=self._error_embed("You are not authorized to use global bans."), ephemeral=False)
 
         await interaction.response.defer()
 
