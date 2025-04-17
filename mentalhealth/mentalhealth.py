@@ -109,7 +109,10 @@ class ButtonView(discord.ui.View):
             role_ping_text = ""
 
         embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
-        await channel.send(content=role_ping_text, embed=embed)
+
+        # Replacing the send method with the allowed_mentions argument
+        allowed_mentions = discord.AllowedMentions(roles=True)
+        await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
         self.stop()
 
 
