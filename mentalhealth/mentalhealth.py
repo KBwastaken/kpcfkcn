@@ -4,6 +4,11 @@ from discord import app_commands
 from redbot.core import commands as redcommands, Config
 from redbot.core.bot import Red
 from typing import Optional
+import datetime
+
+
+# Cooldown dictionary
+user_cooldowns = {}  # user_id -> datetime
 
 
 class MentalHealth(redcommands.Cog):
@@ -12,9 +17,10 @@ class MentalHealth(redcommands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_guild(request_channel=None)
 
-        self.alert_guild_id = 1196173063847411712
-        self.alert_channel_id = 1362387281713041469
-        self.support_role_id = 1362387312134197248
+        self.alert_guild_id = 1256345356199788667
+        self.alert_channel_id = 1340519019760979988
+        self.support_role_id = 1356688519317422322
+        self.cooldown_duration = datetime.timedelta(minutes=5)
 
     @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
@@ -74,6 +80,25 @@ class MentalHealth(redcommands.Cog):
         if message.channel.id != request_channel_id:
             return
 
+        now = datetime.datetime.utcnow()
+        last_request_time = user_cooldowns.get(message.author.id)
+
+        if last_request_time and now - last_request_time < self.cooldown_duration:
+            try:
+                remaining = self.cooldown_duration - (now - last_request_time)
+                minutes = int(remaining.total_seconds() // 60)
+                seconds = int(remaining.total_seconds() % 60)
+                await message.author.send(
+                    f"💙 You've already requested help recently.\n\n"
+                    f"To make sure our team can support everyone properly, please wait **{minutes}m {seconds}s** before sending another request.\n\n"
+                    "We’re still here for you — just give it a little time, and you’ll be able to try again soon. ❤️"
+                )
+            except discord.Forbidden:
+                pass
+            return
+
+        user_cooldowns[message.author.id] = now
+
         try:
             embed = discord.Embed(
                 title="You're not alone 💙",
@@ -99,8 +124,6 @@ class ButtonView(discord.ui.View):
         self.bot = bot
         self.user_message = user_message
         self.support_role_id = support_role_id
-        self.ask_help_button = None
-        self.not_ready_button = None
 
     @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success, custom_id="ask_help")
     async def ask_help(self, interaction: discord.Interaction, button: discord.ui.Button):
