@@ -90,11 +90,11 @@ class ButtonView(discord.ui.View):
         cog = self.bot.get_cog("MentalHealth")
         channel = cog.bot.get_guild(cog.alert_guild_id).get_channel(cog.alert_channel_id)
 
-        # Mention the user who asked for help (clickable user mention)
-        user_mention = f"<@{self.user_message.author.id}>"
+        # Ping the hardcoded support role if they asked for help
+        role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
 
         if wants_help:
-            embed.add_field(name="Status", value=f"{user_mention} asked for help.", inline=False)
+            embed.add_field(name="Status", value=f"{self.user_message.author.name} asked for help.\n{role_ping_text}", inline=False)
         else:
             embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
 
@@ -102,5 +102,5 @@ class ButtonView(discord.ui.View):
         embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
 
         # Send the alert to the configured channel
-        await channel.send(content=user_mention, embed=embed)
+        await channel.send(content=role_ping_text, embed=embed)
         self.stop()
