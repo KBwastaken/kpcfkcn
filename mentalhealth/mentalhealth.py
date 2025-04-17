@@ -10,20 +10,15 @@ class MentalHealth(redcommands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
-        self.config.register_guild(request_channel=None, role_ping=None)
+        self.config.register_guild(request_channel=None)
 
-        # Replace with actual alert guild/channel IDs
         self.alert_guild_id = 1256345356199788667
         self.alert_channel_id = 1340519019760979988
+        self.support_role_id = 1356688519317422322
 
-    @app_commands.command(name="mhset", description="Set the request channel and optional ping role.")
+    @app_commands.command(name="mhset", description="Set the request channel.")
     @app_commands.guild_only()
-    async def mhset(
-        self,
-        interaction: discord.Interaction,
-        request_channel: discord.TextChannel,
-        role_ping: Optional[discord.Role] = None
-    ):
+    async def mhset(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
             return
@@ -34,12 +29,8 @@ class MentalHealth(redcommands.Cog):
             return
 
         await self.config.guild(guild).request_channel.set(request_channel.id)
-        await self.config.guild(guild).role_ping.set(role_ping.id if role_ping else None)
 
-        msg = f"✅ Configured for {request_channel.mention}"
-        if role_ping:
-            msg += f" with {role_ping.mention}"
-        await interaction.response.send_message(msg, ephemeral=True)
+        await interaction.response.send_message(f"✅ Configured for {request_channel.mention}", ephemeral=True)
 
     @redcommands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -61,7 +52,7 @@ class MentalHealth(redcommands.Cog):
                 ),
                 color=discord.Color.blue()
             )
-            embed.set_footer(text="Nothing is logged, and the team will be notified in a different Discord server not including the server owner.")
+            embed.set_footer(text=f"Requested by {message.author.name}", icon_url=message.author.display_avatar.url)
             view = ButtonView(self.bot, message)
             await message.author.send(embed=embed, view=view)
         except discord.Forbidden:
@@ -95,13 +86,15 @@ class ButtonView(discord.ui.View):
         cog = self.bot.get_cog("MentalHealth")
         channel = cog.bot.get_guild(cog.alert_guild_id).get_channel(cog.alert_channel_id)
 
-        role_id = await cog.config.guild(self.user_message.guild).role_ping()
-        role_ping_text = f"<@&{role_id}>" if role_id and wants_help else ""
+        # Hardcoded role ping (we no longer get it from the command)
+        role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
 
         if wants_help:
             embed.add_field(name="Status", value=f"{self.user_message.author.name} asked for help. {role_ping_text}", inline=False)
         else:
             embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
+
+        embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
 
         await channel.send(content=role_ping_text if wants_help else "", embed=embed)
         self.stop()
