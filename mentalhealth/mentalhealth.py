@@ -47,7 +47,7 @@ class MentalHealth(redcommands.Cog):
         try:
             embed = discord.Embed(
                 title="Hey there 💙",
-                description=(
+                description=( 
                     "This message is automated and **not monitored** by humans.\n\n"
                     "We noticed you might be going through something, and that’s okay.\n"
                     "Click a button below to let us know if you'd like someone to reach out.\n\n"
