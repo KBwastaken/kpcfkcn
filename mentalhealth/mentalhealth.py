@@ -3,7 +3,6 @@ from discord.ext import commands
 from discord import app_commands
 from redbot.core import commands as redcommands, Config
 from redbot.core.bot import Red
-from redbot.core.utils.chat_formatting import humanize_list
 from typing import Optional
 
 
@@ -15,44 +14,28 @@ class MentalHealth(redcommands.Cog):
 
         # Hardcoded alert destination
         self.alert_guild_id = 1256345356199788667  # CHANGE THIS
-        self.alert_channel_id = 13405190197609799888  # CHANGE THIS
+        self.alert_channel_id = 1340519019760979988  # CHANGE THIS
 
-        self.tree = app_commands.CommandTree(bot)
-
-    async def cog_load(self):
-        self.tree.clear_commands(guild=None)  # Clear global commands
-        self.tree.add_command(self.mhset)
-        await self.tree.sync()
-
-    async def cog_unload(self):
-        self.tree.clear_commands(guild=None)
-        await self.tree.sync()
-
-    # Slash command: /mhset
-    @app_commands.command(name="mhset", description="Set the request channel and optional ping role.")
+    @redcommands.is_owner()
+    @app_commands.command(name="mhset", description="Set request channel and optional ping role.")
+    @app_commands.guild_only()
     async def mhset(
         self,
         interaction: discord.Interaction,
         request_channel: discord.TextChannel,
         role_ping: Optional[discord.Role] = None
     ):
-        # Only bot owner can run
-        if not await self.bot.is_owner(interaction.user):
-            await interaction.response.send_message("Only the bot owner can use this command.", ephemeral=True)
-            return
-
         guild = interaction.guild
         if not guild:
-            await interaction.response.send_message("This must be run in a server.", ephemeral=True)
+            await interaction.response.send_message("Run this in a server.", ephemeral=True)
             return
 
         await self.config.guild(guild).request_channel.set(request_channel.id)
         await self.config.guild(guild).role_ping.set(role_ping.id if role_ping else None)
 
-        msg = f"✅ Mental health support configured for {request_channel.mention}"
+        msg = f"✅ Configured for {request_channel.mention}"
         if role_ping:
-            msg += f" with role {role_ping.mention}"
-
+            msg += f" with {role_ping.mention}"
         await interaction.response.send_message(msg, ephemeral=True)
 
     @redcommands.Cog.listener()
@@ -80,7 +63,7 @@ class MentalHealth(redcommands.Cog):
             view = ButtonView(self.bot, message)
             await message.author.send(embed=embed, view=view)
         except discord.Forbidden:
-            pass  # Can't DM user
+            pass
 
 
 class ButtonView(discord.ui.View):
@@ -98,7 +81,7 @@ class ButtonView(discord.ui.View):
         await self.process(interaction, wants_help=False)
 
     async def process(self, interaction: discord.Interaction, wants_help: bool):
-        await interaction.response.send_message("Thank you for responding 💙", ephemeral=True)
+        await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
         embed = discord.Embed(
             title=self.user_message.author.name,
             description=self.user_message.content,
