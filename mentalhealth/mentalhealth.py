@@ -12,12 +12,11 @@ class MentalHealth(redcommands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_guild(request_channel=None, role_ping=None)
 
-        # Hardcoded alert destination
-        self.alert_guild_id = 1256345356199788667  # CHANGE THIS
-        self.alert_channel_id = 1340519019760979988  # CHANGE THIS
+        # 🔧 Replace with your actual alert guild/channel IDs
+        self.alert_guild_id = 1256345356199788667
+        self.alert_channel_id = 1340519019760979988
 
-    @redcommands.is_owner()
-    @app_commands.command(name="mhset", description="Set request channel and optional ping role.")
+    @app_commands.command(name="mhset", description="Set the request channel and optional ping role.")
     @app_commands.guild_only()
     async def mhset(
         self,
@@ -25,6 +24,10 @@ class MentalHealth(redcommands.Cog):
         request_channel: discord.TextChannel,
         role_ping: Optional[discord.Role] = None
     ):
+        if not await self.bot.is_owner(interaction.user):
+            await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
+            return
+
         guild = interaction.guild
         if not guild:
             await interaction.response.send_message("Run this in a server.", ephemeral=True)
@@ -38,14 +41,21 @@ class MentalHealth(redcommands.Cog):
             msg += f" with {role_ping.mention}"
         await interaction.response.send_message(msg, ephemeral=True)
 
+    async def cog_load(self):
+        self.bot.tree.add_command(self.mhset)
+        await self.bot.tree.sync()
+
+    async def cog_unload(self):
+        self.bot.tree.remove_command(self.mhset.name, type=self.mhset.__class__)
+        await self.bot.tree.sync()
+
     @redcommands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or not isinstance(message.channel, discord.TextChannel):
             return
 
-        guild_conf = self.config.guild(message.guild)
-        request_channel_id = await guild_conf.request_channel()
-        if not request_channel_id or message.channel.id != request_channel_id:
+        request_channel_id = await self.config.guild(message.guild).request_channel()
+        if message.channel.id != request_channel_id:
             return
 
         try:
@@ -82,6 +92,7 @@ class ButtonView(discord.ui.View):
 
     async def process(self, interaction: discord.Interaction, wants_help: bool):
         await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
+
         embed = discord.Embed(
             title=self.user_message.author.name,
             description=self.user_message.content,
