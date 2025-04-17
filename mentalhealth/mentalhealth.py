@@ -5,7 +5,6 @@ from redbot.core import commands as redcommands, Config
 from redbot.core.bot import Red
 import asyncio
 
-
 class MentalHealth(redcommands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
@@ -19,12 +18,19 @@ class MentalHealth(redcommands.Cog):
         self.cooldown_cache = {}
 
     async def cog_load(self):
-        self.bot.tree.add_command(self.mhset)
-        self.bot.tree.add_command(self.mhsend)
+        # Clear previous commands from the bot's app commands tree
+        if "mhset" in self.bot.tree._commands:
+            del self.bot.tree._commands["mhset"]
+        if "mhsend" in self.bot.tree._commands:
+            del self.bot.tree._commands["mhsend"]
 
-    @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
+        # Now, add the updated commands
+        self.bot.tree.add_command(self.mhset_new)
+        self.bot.tree.add_command(self.mhsend_new)
+
+    @app_commands.command(name="mhset_new", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
-    async def mhset(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
+    async def mhset_new(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
             return
@@ -43,9 +49,9 @@ class MentalHealth(redcommands.Cog):
             await self.config.guild(guild).request_channel.set(request_channel.id)
             await interaction.response.send_message(f"✅ Set {request_channel.mention} as the request channel.", ephemeral=True)
 
-    @app_commands.command(name="mhsend", description="Send mental health awareness message in a channel.")
+    @app_commands.command(name="mhsend_new", description="Send mental health awareness message in a channel.")
     @app_commands.describe(channel="The channel to send the message in.", request_channel="Channel users should message in.")
-    async def mhsend(self, interaction: discord.Interaction, channel: discord.TextChannel, request_channel: discord.TextChannel):
+    async def mhsend_new(self, interaction: discord.Interaction, channel: discord.TextChannel, request_channel: discord.TextChannel):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
             return
@@ -61,7 +67,6 @@ class MentalHealth(redcommands.Cog):
             "It’s important to remember that reaching out for help doesn’t show **weakness** — it shows strength. "
             "No matter what you're going through, whether it's **anxiety**, **depression**, or any other **mental health** challenge, it's okay to ask for **help**. "
             "We all have struggles, and **it’s okay** to lean on others for support. "
-            "If you feel **alone** or **overwhelmed**, talking to someone can be the first step toward **healing**. "
             "You don’t have to carry your burdens **alone**. "
             "We all **deserve** support, compassion, and a chance to **heal**, and it's okay to ask for it when we need it.\n\n"
             "__**You matter, and your mental health matters.**__\n\n"
@@ -169,13 +174,5 @@ class ButtonView(discord.ui.View):
             await interaction.response.send_message("⏳ You recently changed your mind. Please wait an hour before trying again.", ephemeral=True)
             return
 
-        await interaction.response.send_message("No worries! We’re here when you’re ready. Let’s continue the conversation 💙", ephemeral=True)
-        # Resetting the cooldown cache for the user
-        self.bot.cooldown_cache[user_id] = current_time
-
-        # Now process the change of mind as if they are requesting help again
-        await self.process(interaction, wants_help=True)
-
-
-async def setup(bot: Red):
-    await bot.add_cog(MentalHealth(bot))
+        await interaction.response.send_message("No worries! We’re here when you’re ready. Let’s go back to where you were.", ephemeral=True)
+        await self.process(interaction, wants_help=False)
