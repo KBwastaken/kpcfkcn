@@ -102,6 +102,10 @@ class ButtonView(discord.ui.View):
         # Send the alert to the configured channel
         embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
 
-        # Now the role is pinged in the alert message when the user asks for help
-        await channel.send(content=role_ping_text, embed=embed)
+        # Ensure the role is pinged in the message
+        if role_ping_text:
+            await channel.send(content=role_ping_text, embed=embed)
+        else:
+            await channel.send(embed=embed)
+        
         self.stop()
