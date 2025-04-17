@@ -16,10 +16,6 @@ class MentalHealth(redcommands.Cog):
         self.alert_channel_id = 1340519019760979988
         self.support_role_id = 1356688519317422322
 
-    async def cog_load(self):
-        self.bot.tree.add_command(self.mhset)
-        self.bot.tree.add_command(self.mhsend)
-
     @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
     async def mhset(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
