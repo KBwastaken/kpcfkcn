@@ -12,9 +12,9 @@ class MentalHealth(redcommands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_guild(request_channel=None)
 
-        self.alert_guild_id = 1256345356199788667
-        self.alert_channel_id = 1340519019760979988
-        self.support_role_id = 1356688519317422322
+        self.alert_guild_id = 1196173063847411712
+        self.alert_channel_id = 1362387281713041469
+        self.support_role_id = 1362387312134197248
 
     @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
