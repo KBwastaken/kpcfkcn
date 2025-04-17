@@ -31,7 +31,6 @@ class MentalHealth(redcommands.Cog):
             return
 
         await self.config.guild(guild).request_channel.set(request_channel.id)
-
         await interaction.response.send_message(f"✅ Configured for {request_channel.mention}", ephemeral=True)
 
     @redcommands.Cog.listener()
@@ -44,11 +43,6 @@ class MentalHealth(redcommands.Cog):
             return
 
         try:
-            # Send role mention for testing purposes (we'll see if this pings correctly)
-            role_ping_text = f"<@&{self.support_role_id}>"
-            channel = message.guild.get_channel(self.alert_channel_id)
-            await channel.send(content=role_ping_text)  # This should ping the role directly
-            
             embed = discord.Embed(
                 title="Hey there 💙",
                 description=(
@@ -59,7 +53,7 @@ class MentalHealth(redcommands.Cog):
                 ),
                 color=discord.Color.blue()
             )
-            view = ButtonView(self.bot, message, self.support_role_id)  # Pass the support_role_id to the view
+            view = ButtonView(self.bot, message, self.support_role_id)
             await message.author.send(embed=embed, view=view)
         except discord.Forbidden:
             pass
@@ -70,7 +64,7 @@ class ButtonView(discord.ui.View):
         super().__init__(timeout=300)
         self.bot = bot
         self.user_message = user_message
-        self.support_role_id = support_role_id  # Store the support_role_id in the view
+        self.support_role_id = support_role_id
 
     @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success)
     async def ask_help(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -81,7 +75,6 @@ class ButtonView(discord.ui.View):
         await self.process(interaction, wants_help=False)
 
     async def process(self, interaction: discord.Interaction, wants_help: bool):
-        # Reply back with the "Thank you" message
         await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
 
         embed = discord.Embed(
@@ -92,20 +85,21 @@ class ButtonView(discord.ui.View):
         embed.set_thumbnail(url=self.user_message.author.display_avatar.url)
 
         cog = self.bot.get_cog("MentalHealth")
-        channel = cog.bot.get_guild(cog.alert_guild_id).get_channel(cog.alert_channel_id)
+        guild = self.bot.get_guild(cog.alert_guild_id)
+        channel = guild.get_channel(cog.alert_channel_id)
 
-        # Ping the user directly in the `Status` field if they asked for help
         if wants_help:
             embed.add_field(name="Status", value=f"{self.user_message.author.mention} asked for help.", inline=False)
         else:
             embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
 
-        # Hardcoded role ping for alert message if the user asked for help
         role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
+        embed.set_footer(text=f"Requested by {self.user_message.author}", icon_url=self.user_message.author.display_avatar.url)
 
-        # Send the alert to the configured channel
-        embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
-
-        # Now the role is pinged in the alert message when the user asks for help
-        await channel.send(content=role_ping_text, embed=embed)
+        allowed_mentions = discord.AllowedMentions(roles=True, users=False, everyone=False)
+        await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
         self.stop()
+
+
+async def setup(bot: Red):
+    await bot.add_cog(MentalHealth(bot))
