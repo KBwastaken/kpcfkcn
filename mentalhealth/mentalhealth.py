@@ -3,12 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 from redbot.core import commands as redcommands, Config
 from redbot.core.bot import Red
-from typing import Optional
-import datetime
-
-
-# Cooldown dictionary
-user_cooldowns = {}  # user_id -> datetime
+import asyncio
 
 
 class MentalHealth(redcommands.Cog):
@@ -20,7 +15,12 @@ class MentalHealth(redcommands.Cog):
         self.alert_guild_id = 1256345356199788667
         self.alert_channel_id = 1340519019760979988
         self.support_role_id = 1356688519317422322
-        self.cooldown_duration = datetime.timedelta(minutes=5)
+
+        self.cooldown_cache = {}
+
+    async def cog_load(self):
+        self.bot.tree.add_command(self.mhset)
+        self.bot.tree.add_command(self.mhsend)
 
     @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
@@ -80,24 +80,17 @@ class MentalHealth(redcommands.Cog):
         if message.channel.id != request_channel_id:
             return
 
-        now = datetime.datetime.utcnow()
-        last_request_time = user_cooldowns.get(message.author.id)
+        # Global cooldown mechanism
+        user_id = message.author.id
+        current_time = asyncio.get_event_loop().time()
 
-        if last_request_time and now - last_request_time < self.cooldown_duration:
-            try:
-                remaining = self.cooldown_duration - (now - last_request_time)
-                minutes = int(remaining.total_seconds() // 60)
-                seconds = int(remaining.total_seconds() % 60)
-                await message.author.send(
-                    f"💙 You've already requested help recently.\n\n"
-                    f"To make sure our team can support everyone properly, please wait **{minutes}m {seconds}s** before sending another request.\n\n"
-                    "We’re still here for you — just give it a little time, and you’ll be able to try again soon. ❤️"
-                )
-            except discord.Forbidden:
-                pass
+        if user_id in self.cooldown_cache and current_time - self.cooldown_cache[user_id] < 900:  # 15 minutes cooldown
+            remaining_time = 900 - (current_time - self.cooldown_cache[user_id])
+            minutes = int(remaining_time // 60)
+            await message.author.send(
+                f"💙 Hey, you’ve already sent a request. Please wait **{minutes} minutes** before sending another one. Your mental health matters, and we're here when you're ready."
+            )
             return
-
-        user_cooldowns[message.author.id] = now
 
         try:
             embed = discord.Embed(
@@ -114,9 +107,12 @@ class MentalHealth(redcommands.Cog):
             embed.set_footer(text="Your mental health matters")
             view = ButtonView(self.bot, message, self.support_role_id)
             await message.author.send(embed=embed, view=view)
+
+            # Save the time the user sent a request
+            self.cooldown_cache[user_id] = current_time
+
         except discord.Forbidden:
             pass
-
 
 class ButtonView(discord.ui.View):
     def __init__(self, bot, user_message: discord.Message, support_role_id: int):
@@ -125,19 +121,16 @@ class ButtonView(discord.ui.View):
         self.user_message = user_message
         self.support_role_id = support_role_id
 
-    @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success, custom_id="ask_help")
+    @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success)
     async def ask_help(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.process(interaction, wants_help=True)
 
-    @discord.ui.button(label="I’m not ready yet", style=discord.ButtonStyle.secondary, custom_id="not_ready")
+    @discord.ui.button(label="I’m not ready yet", style=discord.ButtonStyle.secondary)
     async def not_ready(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.process(interaction, wants_help=False)
 
     async def process(self, interaction: discord.Interaction, wants_help: bool):
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(view=self)
-        await interaction.followup.send("Thanks for letting us know 💙", ephemeral=True)
+        await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
 
         embed = discord.Embed(
             title=self.user_message.author.name,
@@ -155,30 +148,33 @@ class ButtonView(discord.ui.View):
         else:
             embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
 
+        role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
         embed.set_footer(
             text=f"Requested by {self.user_message.author} • Sent from {self.user_message.guild.name}",
             icon_url=self.user_message.author.display_avatar.url
         )
 
         allowed_mentions = discord.AllowedMentions(roles=True, users=False, everyone=False)
-        role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
+        await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
+        self.stop()
 
-        if wants_help:
-            view = ClaimView()
-            await channel.send(content=role_ping_text, embed=embed, view=view, allowed_mentions=allowed_mentions)
-        else:
-            await channel.send(embed=embed, allowed_mentions=allowed_mentions)
+    @discord.ui.button(label="No, I changed my mind", style=discord.ButtonStyle.danger)
+    async def changed_mind(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 1-hour cooldown to prevent immediate action
+        user_id = interaction.user.id
+        current_time = asyncio.get_event_loop().time()
 
+        # Check if the user already clicked the button recently
+        if user_id in self.bot.cooldown_cache and current_time - self.bot.cooldown_cache[user_id] < 3600:  # 1 hour cooldown
+            await interaction.response.send_message("⏳ You recently changed your mind. Please wait an hour before trying again.", ephemeral=True)
+            return
 
-class ClaimView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+        await interaction.response.send_message("No worries! We’re here when you’re ready. Let’s continue the conversation 💙", ephemeral=True)
+        # Resetting the cooldown cache for the user
+        self.bot.cooldown_cache[user_id] = current_time
 
-    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary)
-    async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        button.disabled = True
-        button.label = f"Claimed by {interaction.user.display_name}"
-        await interaction.response.edit_message(view=self)
+        # Now process the change of mind as if they are requesting help again
+        await self.process(interaction, wants_help=True)
 
 
 async def setup(bot: Red):
