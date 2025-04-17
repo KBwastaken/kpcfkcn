@@ -12,9 +12,12 @@ class MentalHealth(redcommands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_guild(request_channel=None)
 
+        # Replace with actual alert guild/channel IDs
         self.alert_guild_id = 1256345356199788667
         self.alert_channel_id = 1340519019760979988
-        self.support_role_id = 1356688519317422322
+        
+        # Hardcoded role ping for the support team
+        self.support_role_id = 1340519019760979988  # Replace with actual role ID for support
 
     @app_commands.command(name="mhset", description="Set the request channel.")
     @app_commands.guild_only()
@@ -52,7 +55,6 @@ class MentalHealth(redcommands.Cog):
                 ),
                 color=discord.Color.blue()
             )
-            embed.set_footer(text=f"Requested by {message.author.name}", icon_url=message.author.display_avatar.url)
             view = ButtonView(self.bot, message)
             await message.author.send(embed=embed, view=view)
         except discord.Forbidden:
@@ -74,6 +76,7 @@ class ButtonView(discord.ui.View):
         await self.process(interaction, wants_help=False)
 
     async def process(self, interaction: discord.Interaction, wants_help: bool):
+        # Reply back with the "Thank you" message
         await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
 
         embed = discord.Embed(
@@ -94,7 +97,9 @@ class ButtonView(discord.ui.View):
         else:
             embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
 
+        # Footer will be added here for the alert channel
         embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
 
+        # Send the alert to the configured channel
         await channel.send(content=role_ping_text if wants_help else "", embed=embed)
         self.stop()
