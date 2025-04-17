@@ -13,11 +13,11 @@ class MentalHealth(redcommands.Cog):
         self.config.register_guild(request_channel=None)
 
         # Replace with actual alert guild/channel IDs
-        self.alert_guild_id = 1256345356199788667
-        self.alert_channel_id = 1340519019760979988
+        self.alert_guild_id = 123456789012345678
+        self.alert_channel_id = 123456789012345678
         
         # Hardcoded role ping for the support team
-        self.support_role_id = 1340519019760979988  # Replace with actual role ID for support
+        self.support_role_id = 123456789012345678  # Replace with actual role ID for support
 
     @app_commands.command(name="mhset", description="Set the request channel.")
     @app_commands.guild_only()
@@ -55,17 +55,18 @@ class MentalHealth(redcommands.Cog):
                 ),
                 color=discord.Color.blue()
             )
-            view = ButtonView(self.bot, message)
+            view = ButtonView(self.bot, message, self.support_role_id)  # Pass the support_role_id to the view
             await message.author.send(embed=embed, view=view)
         except discord.Forbidden:
             pass
 
 
 class ButtonView(discord.ui.View):
-    def __init__(self, bot, user_message: discord.Message):
+    def __init__(self, bot, user_message: discord.Message, support_role_id: int):
         super().__init__(timeout=300)
         self.bot = bot
         self.user_message = user_message
+        self.support_role_id = support_role_id  # Store the support_role_id in the view
 
     @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success)
     async def ask_help(self, interaction: discord.Interaction, button: discord.ui.Button):
