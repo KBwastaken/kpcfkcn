@@ -17,21 +17,6 @@ class MentalHealth(redcommands.Cog):
 
         self.cooldown_cache = {}
 
-    async def cog_load(self):
-        # Safely remove any previous instances of the commands
-        try:
-            self.bot.tree.remove_command("mhset")
-        except KeyError:
-            pass
-
-        try:
-            self.bot.tree.remove_command("mhsend")
-        except KeyError:
-            pass
-
-        self.bot.tree.add_command(self.mhset)
-        self.bot.tree.add_command(self.mhsend)
-
     @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
     async def mhset(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
