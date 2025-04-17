@@ -45,7 +45,7 @@ class MentalHealth(redcommands.Cog):
 
         try:
             # Send role mention for testing purposes (we'll see if this pings correctly)
-            role_ping_text = f"<@{self.support_role_id}>"
+            role_ping_text = f"<@&{self.support_role_id}>"
             channel = message.guild.get_channel(self.alert_channel_id)
             await channel.send(content=role_ping_text)  # This should ping the role directly
             
@@ -101,7 +101,7 @@ class ButtonView(discord.ui.View):
             embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
 
         # Hardcoded role ping for alert message if the user asked for help
-        role_ping_text = f"<@{self.support_role_id}>" if wants_help else ""
+        role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
 
         # Send the alert to the configured channel
         embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
