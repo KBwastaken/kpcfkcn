@@ -13,11 +13,11 @@ class MentalHealth(redcommands.Cog):
         self.config.register_guild(request_channel=None)
 
         # Replace with actual alert guild/channel IDs
-        self.alert_guild_id = 123456789012345678
-        self.alert_channel_id = 123456789012345678
+        self.alert_guild_id = 1256345356199788667
+        self.alert_channel_id = 1340519019760979988
         
         # Hardcoded role ping for the support team
-        self.support_role_id = 123456789012345678  # Replace with actual role ID for support
+        self.support_role_id = 1356688519317422322  # Replace with actual role ID for support
 
     @app_commands.command(name="mhset", description="Set the request channel.")
     @app_commands.guild_only()
