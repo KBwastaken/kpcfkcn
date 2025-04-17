@@ -5,7 +5,6 @@ from redbot.core import commands as redcommands, Config
 from redbot.core.bot import Red
 from typing import Optional
 
-
 class MentalHealth(redcommands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
@@ -45,9 +44,14 @@ class MentalHealth(redcommands.Cog):
             return
 
         try:
+            # Send role mention for testing purposes (we'll see if this pings correctly)
+            role_ping_text = f"<@&{self.support_role_id}>"
+            channel = message.guild.get_channel(self.alert_channel_id)
+            await channel.send(content=role_ping_text)  # This should ping the role directly
+            
             embed = discord.Embed(
                 title="Hey there 💙",
-                description=( 
+                description=(
                     "This message is automated and **not monitored** by humans.\n\n"
                     "We noticed you might be going through something, and that’s okay.\n"
                     "Click a button below to let us know if you'd like someone to reach out.\n\n"
@@ -102,10 +106,6 @@ class ButtonView(discord.ui.View):
         # Send the alert to the configured channel
         embed.set_footer(text=f"Requested by {self.user_message.author.name}", icon_url=self.user_message.author.display_avatar.url)
 
-        # Ensure the role is pinged in the message
-        if role_ping_text:
-            await channel.send(content=role_ping_text, embed=embed)
-        else:
-            await channel.send(embed=embed)
-        
+        # Now the role is pinged in the alert message when the user asks for help
+        await channel.send(content=role_ping_text, embed=embed)
         self.stop()
