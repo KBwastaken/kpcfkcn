@@ -17,20 +17,25 @@ class MentalHealth(redcommands.Cog):
 
         self.cooldown_cache = {}
 
-    async def cog_load(self):
-        # Clear previous commands from the bot's app commands tree
-        if "mhset" in self.bot.tree._commands:
-            del self.bot.tree._commands["mhset"]
-        if "mhsend" in self.bot.tree._commands:
-            del self.bot.tree._commands["mhsend"]
+        # Manually define app commands but don't auto-sync or add here
+        self.mhset = app_commands.Command(
+            name="mhset",
+            description="Set or unset the mental health request channel.",
+            callback=self._mhset
+        )
+        self.mhsend = app_commands.Command(
+            name="mhsend",
+            description="Send mental health awareness message in a channel.",
+            callback=self._mhsend
+        )
 
-        # Now, add the updated commands
-        self.bot.tree.add_command(self.mhset_new)
-        self.bot.tree.add_command(self.mhsend_new)
+    async def sync_slash_commands(self):
+        self.bot.tree.clear_commands(guild=None)  # Clear old commands
+        self.bot.tree.add_command(self.mhset)
+        self.bot.tree.add_command(self.mhsend)
+        await self.bot.tree.sync()
 
-    @app_commands.command(name="mhset_new", description="Set or unset the mental health request channel.")
-    @app_commands.guild_only()
-    async def mhset_new(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
+    async def _mhset(self, interaction: discord.Interaction, request_channel: discord.TextChannel):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
             return
@@ -49,9 +54,7 @@ class MentalHealth(redcommands.Cog):
             await self.config.guild(guild).request_channel.set(request_channel.id)
             await interaction.response.send_message(f"✅ Set {request_channel.mention} as the request channel.", ephemeral=True)
 
-    @app_commands.command(name="mhsend_new", description="Send mental health awareness message in a channel.")
-    @app_commands.describe(channel="The channel to send the message in.", request_channel="Channel users should message in.")
-    async def mhsend_new(self, interaction: discord.Interaction, channel: discord.TextChannel, request_channel: discord.TextChannel):
+    async def _mhsend(self, interaction: discord.Interaction, channel: discord.TextChannel, request_channel: discord.TextChannel):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
             return
@@ -85,15 +88,14 @@ class MentalHealth(redcommands.Cog):
         if message.channel.id != request_channel_id:
             return
 
-        # Global cooldown mechanism
         user_id = message.author.id
         current_time = asyncio.get_event_loop().time()
 
-        if user_id in self.cooldown_cache and current_time - self.cooldown_cache[user_id] < 900:  # 15 minutes cooldown
+        if user_id in self.cooldown_cache and current_time - self.cooldown_cache[user_id] < 900:
             remaining_time = 900 - (current_time - self.cooldown_cache[user_id])
             minutes = int(remaining_time // 60)
             await message.author.send(
-                f"💙 Hey, you’ve already sent a request. Please wait **{minutes} minutes** before sending another one. Your mental health matters, and we're here when you're ready."
+                f"💙 Hey, you’ve already sent a request. Please wait **{minutes} minutes** before sending another one."
             )
             return
 
@@ -113,7 +115,6 @@ class MentalHealth(redcommands.Cog):
             view = ButtonView(self.bot, message, self.support_role_id)
             await message.author.send(embed=embed, view=view)
 
-            # Save the time the user sent a request
             self.cooldown_cache[user_id] = current_time
 
         except discord.Forbidden:
@@ -165,14 +166,12 @@ class ButtonView(discord.ui.View):
 
     @discord.ui.button(label="No, I changed my mind", style=discord.ButtonStyle.danger)
     async def changed_mind(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 1-hour cooldown to prevent immediate action
         user_id = interaction.user.id
         current_time = asyncio.get_event_loop().time()
 
-        # Check if the user already clicked the button recently
-        if user_id in self.bot.cooldown_cache and current_time - self.bot.cooldown_cache[user_id] < 3600:  # 1 hour cooldown
+        if user_id in self.bot.cooldown_cache and current_time - self.bot.cooldown_cache[user_id] < 3600:
             await interaction.response.send_message("⏳ You recently changed your mind. Please wait an hour before trying again.", ephemeral=True)
             return
 
-        await interaction.response.send_message("No worries! We’re here when you’re ready. Let’s go back to where you were.", ephemeral=True)
+        await interaction.response.send_message("No worries! We’re here when you’re ready.", ephemeral=True)
         await self.process(interaction, wants_help=False)
