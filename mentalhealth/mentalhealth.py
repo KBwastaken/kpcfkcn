@@ -14,8 +14,8 @@ class MentalHealth(redcommands.Cog):
         self.config.register_guild(request_channel=None, role_ping=None)
 
         # Hardcoded alert destination
-        self.alert_guild_id = 123456789012345678  # CHANGE THIS
-        self.alert_channel_id = 123456789012345678  # CHANGE THIS
+        self.alert_guild_id = 1256345356199788667  # CHANGE THIS
+        self.alert_channel_id = 13405190197609799888  # CHANGE THIS
 
         self.tree = app_commands.CommandTree(bot)
 
