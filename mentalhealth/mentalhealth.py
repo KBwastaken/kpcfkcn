@@ -39,7 +39,13 @@ class MentalHealth(redcommands.Cog):
         if message.author.bot or not isinstance(message.channel, discord.TextChannel):
             return
 
+        # Retrieve the request channel ID
         request_channel_id = await self.config.guild(message.guild).request_channel()
+
+        # Debugging: Check if the request channel ID is being retrieved correctly
+        print(f"Request Channel ID: {request_channel_id}, Current Channel ID: {message.channel.id}")
+
+        # Check if the message was sent in the request channel
         if message.channel.id != request_channel_id:
             return
 
@@ -59,75 +65,84 @@ class MentalHealth(redcommands.Cog):
         except discord.Forbidden:
             pass
 
-    @app_commands.command(name="mhsend", description="Send a mental health awareness message.")
+
+class ButtonView(discord.ui.View):
+    def __init__(self, bot, user_message: discord.Message, support_role_id: int):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.user_message = user_message
+        self.support_role_id = support_role_id
+
+    @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success)
+    async def ask_help(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process(interaction, wants_help=True)
+
+    @discord.ui.button(label="I’m not ready yet", style=discord.ButtonStyle.secondary)
+    async def not_ready(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process(interaction, wants_help=False)
+
+    async def process(self, interaction: discord.Interaction, wants_help: bool):
+        await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
+
+        embed = discord.Embed(
+            title=self.user_message.author.name,
+            description=self.user_message.content,
+            color=discord.Color.green() if wants_help else discord.Color.orange()
+        )
+        embed.set_thumbnail(url=self.user_message.author.display_avatar.url)
+
+        cog = self.bot.get_cog("MentalHealth")
+        guild = self.bot.get_guild(cog.alert_guild_id)
+        channel = guild.get_channel(cog.alert_channel_id)
+
+        if wants_help:
+            embed.add_field(name="Status", value=f"{self.user_message.author.mention} asked for help.", inline=False)
+        else:
+            embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
+
+        role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
+        embed.set_footer(text=f"Requested by {self.user_message.author} | Sent from {self.user_message.channel.name}",
+                         icon_url=self.user_message.author.display_avatar.url)
+
+        allowed_mentions = discord.AllowedMentions(roles=True, users=False, everyone=False)
+        await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
+        self.stop()
+
+    @app_commands.command(name="mhsend", description="Send a mental health message to a specific channel.")
     @app_commands.guild_only()
     async def mhsend(self, interaction: discord.Interaction, channel: discord.TextChannel, request_channel: discord.TextChannel):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message("❌ Only the bot owner can use this command.", ephemeral=True)
             return
 
+        # Construct the message
+        message = (
+            "# Mental Health\n\n"
+            "**Mental health** is an important aspect of our overall well-being, yet it's often overlooked or **misunderstood**. "
+            "The reality is that mental health struggles can be incredibly **isolating**, and many people **suffer** in silence. "
+            "Tragically, the statistics show the severity of this issue, every **11** minutes, someone dies by **su1c!de**. "
+            "That’s one **life** lost every **11 minutes** to a problem that, with the right **support**, could be addressed. "
+            "These numbers are a stark reminder that **mental health** isn’t something to take **lightly**, and it’s essential "
+            "that we break the silence around it. Talking about our **feelings**, seeking **support**, and opening up to others "
+            "can make all the **difference**. It’s important to remember that reaching out for help doesn’t show **weakness**, "
+            "it shows strength. No matter what you're going through, whether it's **anxiety**, **depression**, or any other **mental "
+            "health** challenge, it's okay to ask for **help**. We all have struggles, and **it’s okay** to lean on others for support. "
+            "If you feel **alone** or **overwhelmed**, talking to someone can be the first step toward **healing**. You don’t have "
+            "to carry your burdens **alone**. We all **deserve** support, compassion, and a chance to **heal**, and it's okay to ask for "
+            "it when we need it.\n\n"
+            "__**You matter, and your mental health matters.**__\n\n"
+            f"Send a message in {request_channel.mention}. The team is professional and will NEVER share anything."
+        )
+
         embed = discord.Embed(
-            title="Mental Health",
-            description=(
-                "**Mental health** is an important aspect of our overall well-being, yet it's often overlooked or **misunderstood**. "
-                "The reality is that mental health struggles can be incredibly **isolating**, and many people **suffer** in silence. "
-                "Tragically, the statistics show the severity of this issue, every **11** minutes, someone dies by **su1c!de**. "
-                "That’s one **life** lost every **11 minutes** to a problem that, with the right **support**, could be addressed. "
-                "These numbers are a stark reminder that **mental health** isn’t something to take **lightly**, and it’s essential "
-                "that we break the silence around it. Talking about our **feelings**, seeking **support**, and opening up to others can make all the **difference**. "
-                "It’s important to remember that reaching out for help doesn’t show **weakness**, it shows strength. No matter what you're going through, whether it's "
-                "**anxiety**, **depression**, or any other **mental health** challenge, it's okay to ask for **help**. We all have struggles, and **it’s okay** to lean "
-                "on others for support. If you feel **alone** or **overwhelmed**, talking to someone can be the first step toward **healing**. "
-                "You don’t have to carry your burdens **alone**. We all **deserve** support, compassion, and a chance to **heal**, and it's okay to ask for it when we need it.\n\n"
-                "__**You matter, and your mental health matters.**__\n\n"
-                f"Send a message in {request_channel.mention}. The team is professional and will NEVER share anything."
-            ),
+            title="Mental Health Awareness",
+            description=message,
             color=discord.Color.green()
         )
-        embed.set_footer(text=f"Sent from {channel.name}")
+        
+        # Send the message in the provided channel
         await channel.send(embed=embed)
-
-    class ButtonView(discord.ui.View):
-        def __init__(self, bot, user_message: discord.Message, support_role_id: int):
-            super().__init__(timeout=300)
-            self.bot = bot
-            self.user_message = user_message
-            self.support_role_id = support_role_id
-
-        @discord.ui.button(label="Ask for help!", style=discord.ButtonStyle.success)
-        async def ask_help(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await self.process(interaction, wants_help=True)
-
-        @discord.ui.button(label="I’m not ready yet", style=discord.ButtonStyle.secondary)
-        async def not_ready(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await self.process(interaction, wants_help=False)
-
-        async def process(self, interaction: discord.Interaction, wants_help: bool):
-            await interaction.response.send_message("Thanks for letting us know 💙", ephemeral=True)
-
-            embed = discord.Embed(
-                title=self.user_message.author.name,
-                description=self.user_message.content,
-                color=discord.Color.green() if wants_help else discord.Color.orange()
-            )
-            embed.set_thumbnail(url=self.user_message.author.display_avatar.url)
-
-            cog = self.bot.get_cog("MentalHealth")
-            guild = self.bot.get_guild(cog.alert_guild_id)
-            channel = guild.get_channel(cog.alert_channel_id)
-
-            if wants_help:
-                embed.add_field(name="Status", value=f"{self.user_message.author.mention} asked for help.", inline=False)
-            else:
-                embed.add_field(name="NOTICE", value="⚠️ THIS USER DID NOT ASK FOR HELP. DO NOT DM.", inline=False)
-
-            role_ping_text = f"<@&{self.support_role_id}>" if wants_help else ""
-            embed.set_footer(text=f"Requested by {self.user_message.author} | Sent from {self.user_message.channel.name}",
-                             icon_url=self.user_message.author.display_avatar.url)
-
-            allowed_mentions = discord.AllowedMentions(roles=True, users=False, everyone=False)
-            await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
-            self.stop()
+        await interaction.response.send_message(f"✅ Message sent to {channel.mention}!", ephemeral=True)
 
 
 async def setup(bot: Red):
