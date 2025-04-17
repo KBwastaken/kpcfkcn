@@ -12,7 +12,7 @@ class MentalHealth(redcommands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_guild(request_channel=None, role_ping=None)
 
-        # 🔧 Replace with your actual alert guild/channel IDs
+        # Replace with actual alert guild/channel IDs
         self.alert_guild_id = 1256345356199788667
         self.alert_channel_id = 1340519019760979988
 
@@ -40,14 +40,6 @@ class MentalHealth(redcommands.Cog):
         if role_ping:
             msg += f" with {role_ping.mention}"
         await interaction.response.send_message(msg, ephemeral=True)
-
-    async def cog_load(self):
-        self.bot.tree.add_command(self.mhset)
-        await self.bot.tree.sync()
-
-    async def cog_unload(self):
-        self.bot.tree.remove_command(self.mhset.name, type=self.mhset.__class__)
-        await self.bot.tree.sync()
 
     @redcommands.Cog.listener()
     async def on_message(self, message: discord.Message):
