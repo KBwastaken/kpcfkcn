@@ -12,9 +12,9 @@ class MentalHealth(redcommands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_guild(request_channel=None)
 
-        self.alert_guild_id = 1196173063847411712
-        self.alert_channel_id = 1362387281713041469
-        self.support_role_id = 1362387312134197248
+        self.alert_guild_id = 1256345356199788667
+        self.alert_channel_id = 1340519019760979988
+        self.support_role_id = 1356688519317422322
 
     @app_commands.command(name="mhset", description="Set or unset the mental health request channel.")
     @app_commands.guild_only()
@@ -134,8 +134,24 @@ class ButtonView(discord.ui.View):
         )
 
         allowed_mentions = discord.AllowedMentions(roles=True, users=False, everyone=False)
-        await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
+
+        if wants_help:
+            view = ClaimView()
+            await channel.send(content=role_ping_text, embed=embed, view=view, allowed_mentions=allowed_mentions)
+        else:
+            await channel.send(content=None, embed=embed, allowed_mentions=allowed_mentions)
         self.stop()
+
+
+class ClaimView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary)
+    async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.disabled = True
+        button.label = f"Claimed by {interaction.user.display_name}"
+        await interaction.response.edit_message(view=self)
 
 
 async def setup(bot: Red):
