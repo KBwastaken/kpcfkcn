@@ -80,6 +80,12 @@ class MentalHealth(redcommands.Cog):
         if message.channel.id != request_channel_id:
             return
 
+        # 🧹 Immediately delete the message
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            pass  # Not enough perms to delete — silently ignore
+
         now = datetime.datetime.utcnow()
         last_request_time = user_cooldowns.get(message.author.id)
 
