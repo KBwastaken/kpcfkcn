@@ -5,12 +5,24 @@ from datetime import datetime, timedelta
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import bold, box
+
 import logging
 
 log = logging.getLogger("red.automod")
 
 class AutoMod(commands.Cog):
     """Automod integration with Discord AutoMod system."""
+
+    def load_blocked_words(self):
+        try:
+            base_path = os.path.dirname(__file__)
+            file_path = os.path.join(base_path, "blocked_words.txt")
+            with open(file_path, "r", encoding="utf-8") as f:
+                words = [line.strip().lower() for line in f if line.strip()]
+            return set(words)
+        except FileNotFoundError:
+            log.error("automod/blocked_words.txt not found.")
+            return set()
 
     def __init__(self, bot: Red):
         self.bot = bot
@@ -34,19 +46,8 @@ class AutoMod(commands.Cog):
         self.max_warnings = 3
         self.muted_role_name = "KCN | Muted"
 
-        # Load blocked words from the external file
         self.blocked_words = self.load_blocked_words()
 
-def load_blocked_words(self):
-    try:
-        base_path = os.path.dirname(__file__)
-        file_path = os.path.join(base_path, "blocked_words.txt")
-        with open(file_path, "r", encoding="utf-8") as f:
-            words = [line.strip().lower() for line in f if line.strip()]
-        return set(words)
-    except FileNotFoundError:
-        log.error("automod/blocked_words.txt not found.")
-        return set()
     # ------------------- Event Listener -------------------
 
     @commands.Cog.listener()
@@ -57,7 +58,6 @@ def load_blocked_words(self):
 
         await self.add_warning(user, reason)
 
-        # AutoMod Violations
         if action.action_type == discord.AutoModActionType.block_message:
             await self.send_alert(action.guild, f"Blocked message from {user.mention} due to: {reason}")
             await self.add_warning(user, "Blocked message due to: " + reason)
@@ -136,8 +136,7 @@ def load_blocked_words(self):
 
     @automod.command()
     async def setup(self, ctx: commands.Context):
-        """Walks through the automod setup and enables Discord's automod."""
-
+        """Walks through the automod setup (without editing AutoMod rules)."""
         await ctx.send("Enter the alert channel (mention it):")
         try:
             msg = await self.bot.wait_for("message", timeout=60, check=lambda m: m.author == ctx.author)
