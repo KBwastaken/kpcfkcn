@@ -4,14 +4,11 @@ from datetime import datetime, timedelta
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import bold, box
-
 import logging
 import json
 import os
-import re
 
 log = logging.getLogger("red.automod")
-
 
 class AutoMod(commands.Cog):
     """Automod integration with Discord AutoMod system."""
@@ -37,6 +34,7 @@ class AutoMod(commands.Cog):
         self.warning_expiry_days = 14
         self.max_warnings = 3
         self.muted_role_name = "KCN | Muted"
+        self.protected_role_name = "KCN | Protected"
 
         self.blocked_words = self.load_blocked_words()
 
@@ -60,26 +58,22 @@ class AutoMod(commands.Cog):
         if not message.guild or message.author.bot:
             return
 
-        # Clean and split the message into words
-        lowered = message.content.lower()
-        
-        # Split the message into words using a regex to handle punctuation and spaces
-        words = re.findall(r'\b\w+\b', lowered)  # This will match whole words, ignoring punctuation
+        if any(role.name == self.protected_role_name for role in message.author.roles):
+            return
 
-        # Check if any of the words match blocked words
-        for word in words:
-            if word in self.blocked_words:
-                try:
-                    await message.delete()
-                except discord.Forbidden:
-                    pass
-                await self.add_warning(message.author, f"Blocked word usage: {word}")
-                await self.send_alert(message.guild, f"{message.author.mention} used a blocked word: {word}.")
-                return  # Exit after the first match (you don't need to check further words)
+        lowered_words = message.content.lower().split()
+        if any(word in lowered_words for word in self.blocked_words):
+            try:
+                await message.delete()
+            except discord.Forbidden:
+                pass
+            matched_word = next(word for word in lowered_words if word in self.blocked_words)
+            await self.add_warning(message.author, f"Blocked word usage: {matched_word}", message)
+            await self.send_alert(message.guild, f"{message.author.mention} used a blocked word: `{matched_word}`")
 
     # ------------------- Warning System -------------------
 
-    async def add_warning(self, user: discord.User, reason: str):
+    async def add_warning(self, user: discord.Member, reason: str, original_message=None):
         now = datetime.utcnow()
         warnings = await self.config.user(user).warnings()
 
@@ -90,7 +84,15 @@ class AutoMod(commands.Cog):
         await self.config.user(user).warnings.set(warnings)
 
         try:
-            await user.send(f"You have received a warning: {reason}")
+            embed = discord.Embed(
+                title="⚠️ Warning: Blocked Word Usage",
+                description=f"You used a blocked word: **{reason.split(': ')[-1]}**",
+                color=discord.Color.orange(),
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Message", value=original_message.content if original_message else "Unknown", inline=False)
+            embed.set_footer(text="If you think this is a mistake, please reply to this DM to contact moderators.")
+            await user.send(embed=embed)
         except discord.Forbidden:
             pass
 
@@ -191,17 +193,10 @@ class AutoMod(commands.Cog):
 
     # ------------------- Utility Commands -------------------
 
-    @commands.is_owner()
-    @commands.command()
-    async def smute(self, ctx: commands.Context, user: discord.User):
-        """Globally mute a user."""
-        await self.global_mute(user)
-        await ctx.send(f"{user.mention} has been muted in all shared servers.")
-
-    @commands.is_owner()
+    @commands.has_permissions(moderate_members=True)
     @commands.command()
     async def sunmute(self, ctx: commands.Context, user: discord.User):
-        """Globally unmute a user."""
+        """Globally unmute a user (requires timeout permissions)."""
         for guild in self.bot.guilds:
             role_id = await self.config.guild(guild).muted_role()
             if not role_id:
@@ -219,18 +214,30 @@ class AutoMod(commands.Cog):
 
     @commands.is_owner()
     @commands.command()
+    async def smute(self, ctx: commands.Context, user: discord.User):
+        """Globally mute a user."""
+        await self.global_mute(user)
+        await ctx.send(f"{user.mention} has been muted in all shared servers.")
+
+    @commands.has_permissions(manage_guild=True)
+    @commands.guild_only()
+    @commands.command()
     async def warnings(self, ctx: commands.Context, user: discord.User):
-        """Check a user's warnings."""
+        """Check a user's warnings (requires Manage Server)."""
         warnings = await self.config.user(user).warnings()
         if not warnings:
             return await ctx.send("No warnings.")
-        msg = "\n".join(f"{i+1}. {w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>" for i, w in enumerate(warnings))
+        msg = "\n".join(
+            f"{i+1}. {w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>"
+            for i, w in enumerate(warnings)
+        )
         await ctx.send(box(msg))
 
-    @commands.is_owner()
+    @commands.has_permissions(manage_guild=True)
+    @commands.guild_only()
     @commands.command()
     async def clearwarns(self, ctx: commands.Context, user: discord.User):
-        """Clear a user's warnings."""
+        """Clear a user's warnings (requires Manage Server)."""
         await self.config.user(user).warnings.set([])
         await ctx.send(f"Cleared warnings for {user.mention}.")
 
