@@ -11,7 +11,6 @@ import os
 
 log = logging.getLogger("red.automod")
 
-
 class AutoMod(commands.Cog):
     """Automod integration with Discord AutoMod system."""
 
@@ -52,12 +51,20 @@ class AutoMod(commands.Cog):
             log.error(f"JSON error in blocked_words.txt: {e}")
             return []
 
+    def is_immune(self, member: discord.Member):
+        """Check if a member is immune from automod actions (by role)."""
+        protected_role = discord.utils.get(member.guild.roles, name="KCN | Protected")
+        return protected_role in member.roles
+
     # ------------------- Event Listener -------------------
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.guild or message.author.bot:
             return
+
+        if self.is_immune(message.author):
+            return  # Ignore the message if the user is immune
 
         lowered = message.content.lower()
         if any(word in lowered for word in self.blocked_words):
@@ -67,6 +74,7 @@ class AutoMod(commands.Cog):
                 pass
             await self.add_warning(message.author, "Blocked word usage")
             await self.send_alert(message.guild, f"{message.author.mention} used a blocked word.")
+            await self.send_warning_dm(message.author, message.content)
 
     # ------------------- Warning System -------------------
 
@@ -88,6 +96,19 @@ class AutoMod(commands.Cog):
         if len(warnings) >= self.max_warnings:
             await self.global_mute(user)
             await self.send_warning_embed(user, warnings)
+
+    async def send_warning_dm(self, user: discord.User, content: str):
+        """Send a nice DM embed to the user when they use a blocked word."""
+        embed = discord.Embed(
+            title="Warning: Blocked Word Usage",
+            description=f"Hello {user.name},\n\nYou used a blocked word: **{content}**.\nPlease refrain from using inappropriate language.\n\nIf you think this is a mistake, feel free to DM the bot with your concern.",
+            color=discord.Color.orange()
+        )
+        embed.set_footer(text="Automod System | Please contact a moderator if you need assistance.")
+        try:
+            await user.send(embed=embed)
+        except discord.Forbidden:
+            pass
 
     async def send_warning_embed(self, user: discord.User, warnings: list):
         for guild in self.bot.guilds:
