@@ -1,28 +1,19 @@
 import discord
 import asyncio
-import os
 from datetime import datetime, timedelta
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import bold, box
 
 import logging
+import json
+import os
 
 log = logging.getLogger("red.automod")
 
+
 class AutoMod(commands.Cog):
     """Automod integration with Discord AutoMod system."""
-
-    def load_blocked_words(self):
-        try:
-            base_path = os.path.dirname(__file__)
-            file_path = os.path.join(base_path, "blocked_words.txt")
-            with open(file_path, "r", encoding="utf-8") as f:
-                words = [line.strip().lower() for line in f if line.strip()]
-            return set(words)
-        except FileNotFoundError:
-            log.error("automod/blocked_words.txt not found.")
-            return set()
 
     def __init__(self, bot: Red):
         self.bot = bot
@@ -48,19 +39,34 @@ class AutoMod(commands.Cog):
 
         self.blocked_words = self.load_blocked_words()
 
+    def load_blocked_words(self):
+        path = os.path.join(os.path.dirname(__file__), "blocked_words.txt")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                words = json.load(f)
+                return [w.lower() for w in words if isinstance(w, str)]
+        except FileNotFoundError:
+            log.error("blocked_words.txt not found.")
+            return []
+        except json.JSONDecodeError as e:
+            log.error(f"JSON error in blocked_words.txt: {e}")
+            return []
+
     # ------------------- Event Listener -------------------
 
     @commands.Cog.listener()
-    async def on_auto_moderation_action(self, action: discord.AutoModAction):
-        """Handle AutoMod actions."""
-        user = action.user
-        reason = action.rule_name or "AutoMod violation"
+    async def on_message(self, message: discord.Message):
+        if not message.guild or message.author.bot:
+            return
 
-        await self.add_warning(user, reason)
-
-        if action.action_type == discord.AutoModActionType.block_message:
-            await self.send_alert(action.guild, f"Blocked message from {user.mention} due to: {reason}")
-            await self.add_warning(user, "Blocked message due to: " + reason)
+        lowered = message.content.lower()
+        if any(word in lowered for word in self.blocked_words):
+            try:
+                await message.delete()
+            except discord.Forbidden:
+                pass
+            await self.add_warning(message.author, "Blocked word usage")
+            await self.send_alert(message.guild, f"{message.author.mention} used a blocked word.")
 
     # ------------------- Warning System -------------------
 
@@ -136,7 +142,7 @@ class AutoMod(commands.Cog):
 
     @automod.command()
     async def setup(self, ctx: commands.Context):
-        """Walks through the automod setup (without editing AutoMod rules)."""
+        """Walks through the automod setup (without Discord AutoMod API)."""
         await ctx.send("Enter the alert channel (mention it):")
         try:
             msg = await self.bot.wait_for("message", timeout=60, check=lambda m: m.author == ctx.author)
@@ -182,6 +188,25 @@ class AutoMod(commands.Cog):
         """Globally mute a user."""
         await self.global_mute(user)
         await ctx.send(f"{user.mention} has been muted in all shared servers.")
+
+    @commands.is_owner()
+    @commands.command()
+    async def sunmute(self, ctx: commands.Context, user: discord.User):
+        """Globally unmute a user."""
+        for guild in self.bot.guilds:
+            role_id = await self.config.guild(guild).muted_role()
+            if not role_id:
+                continue
+            role = guild.get_role(role_id)
+            if not role:
+                continue
+            member = guild.get_member(user.id)
+            if member and role in member.roles:
+                try:
+                    await member.remove_roles(role, reason="Manual unmute")
+                except discord.Forbidden:
+                    continue
+        await ctx.send(f"{user.mention} has been unmuted in all shared servers.")
 
     @commands.is_owner()
     @commands.command()
