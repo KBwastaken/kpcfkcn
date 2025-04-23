@@ -4,14 +4,13 @@ from datetime import datetime, timedelta
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import bold, box
-
 import logging
-import json
+import os
 
 log = logging.getLogger("red.automod")
 
 class AutoMod(commands.Cog):
-    """Automod integration with Discord AutoMod system."""
+    """Automod integration with custom word list system."""
 
     def __init__(self, bot: Red):
         self.bot = bot
@@ -35,10 +34,27 @@ class AutoMod(commands.Cog):
         self.max_warnings = 3
         self.muted_role_name = "KCN | Muted"
 
-        # Blocked words and exceptions
-        self.blocked_words = set([  # These words should be blocked by Discord's AutoMod, not manually added.
-            "dildo", "fuck", "fucking", "shit", "shitty", "damn", "bitch", "bullshit"
-        ])
+        # Load blocked words from a file
+        self.blocked_words = self.load_blocked_words()
+
+    def load_blocked_words(self):
+        """Load blocked words from a file."""
+        blocked_words = set()
+        try:
+            file_path = "blocked_words.txt"  # Path to the text file
+            if not os.path.exists(file_path):
+                log.error("blocked_words.txt not found.")
+                return blocked_words
+
+            with open(file_path, "r", encoding="utf-8") as file:
+                for line in file:
+                    word = line.strip().lower()  # Remove any extra whitespace or newlines
+                    if word:  # Avoid adding empty lines
+                        blocked_words.add(word)
+        except Exception as e:
+            log.error(f"Error loading blocked words: {e}")
+        
+        return blocked_words
 
     # ------------------- Event Listener -------------------
 
@@ -129,10 +145,7 @@ class AutoMod(commands.Cog):
 
     @automod.command()
     async def setup(self, ctx: commands.Context):
-        """Walks through the automod setup and enables Discord's automod."""
-        # Configure the Discord AutoMod settings
-        await self.setup_automod(ctx)
-
+        """Walks through the automod setup."""
         # Walkthrough the other settings (alert channel, mod roles, etc.)
         await ctx.send("Enter the alert channel (mention it):")
         try:
@@ -164,39 +177,6 @@ class AutoMod(commands.Cog):
 
         await self.config.guild(ctx.guild).muted_role.set(muted_role.id)
         await ctx.send("Setup complete!")
-
-    async def setup_automod(self, ctx: commands.Context):
-        """Enable AutoMod settings."""
-        guild = ctx.guild
-        try:
-            automod = guild.auto_moderation
-            # Set block mention spam limit
-            await automod.add_rule(
-                name="Block Mention Spam",
-                actions=[discord.AutoModActionType.block_message],
-                filters=[discord.AutoModActionFilter.mention_count(max_mentions=15)]
-            )
-            # Enable mention raid detection
-            await automod.add_rule(
-                name="Enable Mention Raid",
-                actions=[discord.AutoModActionType.block_message],
-                filters=[discord.AutoModActionFilter.mention_count(max_mentions=5)]
-            )
-            # Block commonly flagged words
-            await automod.add_rule(
-                name="Block Commonly Flagged Words",
-                actions=[discord.AutoModActionType.block_message],
-                filters=[discord.AutoModActionFilter.content(words=self.blocked_words)]
-            )
-        except Exception as e:
-            log.error(f"Error setting up automod: {e}")
-            await ctx.send(f"Failed to set up automod: {e}")
-
-    @automod.command()
-    async def resetconfig(self, ctx: commands.Context):
-        """Reset all configuration."""
-        await self.config.guild(ctx.guild).clear()
-        await ctx.send("Configuration reset.")
 
     # ------------------- Utility Commands -------------------
 
