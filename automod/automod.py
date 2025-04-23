@@ -37,24 +37,25 @@ class AutoMod(commands.Cog):
         # Load blocked words from a file
         self.blocked_words = self.load_blocked_words()
 
-    def load_blocked_words(self):
-        """Load blocked words from a file."""
-        blocked_words = set()
-        try:
-            file_path = "blocked_words.txt"  # Path to the text file
-            if not os.path.exists(file_path):
-                log.error("blocked_words.txt not found.")
-                return blocked_words
+def load_blocked_words(self):
+    """Load blocked words from a file."""
+    blocked_words = set()
+    try:
+        file_path = "automod/blocked_words.txt"  # Adjusted path to the file
+        if not os.path.exists(file_path):
+            log.error(f"{file_path} not found.")
+            return blocked_words
 
-            with open(file_path, "r", encoding="utf-8") as file:
-                for line in file:
-                    word = line.strip().lower()  # Remove any extra whitespace or newlines
-                    if word:  # Avoid adding empty lines
-                        blocked_words.add(word)
-        except Exception as e:
-            log.error(f"Error loading blocked words: {e}")
-        
-        return blocked_words
+        with open(file_path, "r", encoding="utf-8") as file:
+            for line in file:
+                word = line.strip().lower()  # Remove any extra whitespace or newlines
+                if word:  # Avoid adding empty lines
+                    blocked_words.add(word)
+    except Exception as e:
+        log.error(f"Error loading blocked words: {e}")
+    
+    return blocked_words
+
 
     # ------------------- Event Listener -------------------
 
