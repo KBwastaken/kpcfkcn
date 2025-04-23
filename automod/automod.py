@@ -146,7 +146,6 @@ class AutoMod(commands.Cog):
     @automod.command()
     async def setup(self, ctx: commands.Context):
         """Walks through the automod setup and enables Discord's automod."""
-        await self.setup_automod(ctx)
 
         await ctx.send("Enter the alert channel (mention it):")
         try:
