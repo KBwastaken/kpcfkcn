@@ -8,8 +8,10 @@ from redbot.core.utils.chat_formatting import bold, box
 import logging
 import json
 import os
+import re
 
 log = logging.getLogger("red.automod")
+
 
 class AutoMod(commands.Cog):
     """Automod integration with Discord AutoMod system."""
@@ -51,11 +53,6 @@ class AutoMod(commands.Cog):
             log.error(f"JSON error in blocked_words.txt: {e}")
             return []
 
-    def is_immune(self, member: discord.Member):
-        """Check if a member is immune from automod actions (by role)."""
-        protected_role = discord.utils.get(member.guild.roles, name="KCN | Protected")
-        return protected_role in member.roles
-
     # ------------------- Event Listener -------------------
 
     @commands.Cog.listener()
@@ -63,18 +60,22 @@ class AutoMod(commands.Cog):
         if not message.guild or message.author.bot:
             return
 
-        if self.is_immune(message.author):
-            return  # Ignore the message if the user is immune
-
+        # Clean and split the message into words
         lowered = message.content.lower()
-        if any(word in lowered for word in self.blocked_words):
-            try:
-                await message.delete()
-            except discord.Forbidden:
-                pass
-            await self.add_warning(message.author, "Blocked word usage")
-            await self.send_alert(message.guild, f"{message.author.mention} used a blocked word.")
-            await self.send_warning_dm(message.author, message.content)
+        
+        # Split the message into words using a regex to handle punctuation and spaces
+        words = re.findall(r'\b\w+\b', lowered)  # This will match whole words, ignoring punctuation
+
+        # Check if any of the words match blocked words
+        for word in words:
+            if word in self.blocked_words:
+                try:
+                    await message.delete()
+                except discord.Forbidden:
+                    pass
+                await self.add_warning(message.author, f"Blocked word usage: {word}")
+                await self.send_alert(message.guild, f"{message.author.mention} used a blocked word: {word}.")
+                return  # Exit after the first match (you don't need to check further words)
 
     # ------------------- Warning System -------------------
 
@@ -96,19 +97,6 @@ class AutoMod(commands.Cog):
         if len(warnings) >= self.max_warnings:
             await self.global_mute(user)
             await self.send_warning_embed(user, warnings)
-
-    async def send_warning_dm(self, user: discord.User, content: str):
-        """Send a nice DM embed to the user when they use a blocked word."""
-        embed = discord.Embed(
-            title="Warning: Blocked Word Usage",
-            description=f"Hello {user.name},\n\nYou used a blocked word: **{content}**.\nPlease refrain from using inappropriate language.\n\nIf you think this is a mistake, feel free to DM the bot with your concern.",
-            color=discord.Color.orange()
-        )
-        embed.set_footer(text="Automod System | Please contact a moderator if you need assistance.")
-        try:
-            await user.send(embed=embed)
-        except discord.Forbidden:
-            pass
 
     async def send_warning_embed(self, user: discord.User, warnings: list):
         for guild in self.bot.guilds:
