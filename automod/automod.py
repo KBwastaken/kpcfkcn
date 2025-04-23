@@ -112,18 +112,24 @@ class AutoMod(commands.Cog):
                 continue
 
             mod_roles = [guild.get_role(rid) for rid in mod_roles_ids if guild.get_role(rid)]
+            role_ping_text = " ".join(f"<@&{r.id}>" for r in mod_roles)
+            allowed_mentions = discord.AllowedMentions(roles=True, users=True, everyone=False)
 
             embed = discord.Embed(
-                title=f"{user} reached 3 warnings",
+                title=f"{user} reached {self.max_warnings} warnings",
                 color=discord.Color.red()
             )
             embed.set_author(name=str(user), icon_url=user.display_avatar.url)
             for i, w in enumerate(warnings, 1):
-                embed.add_field(name=f"Warning {i}", value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>", inline=False)
+                embed.add_field(
+                    name=f"Warning {i}",
+                    value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>",
+                    inline=False
+                )
             embed.set_footer(text=f"User ID: {user.id}")
 
-            content = f"{user.mention} {' '.join(r.mention for r in mod_roles)}"
-            await alert_channel.send(content=content, embed=embed)
+            content = f"{user.mention} {role_ping_text}"
+            await alert_channel.send(content=content, embed=embed, allowed_mentions=allowed_mentions)
 
     # ------------------- Mute System -------------------
 
