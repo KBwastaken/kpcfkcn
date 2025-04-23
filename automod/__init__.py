@@ -1,4 +1,5 @@
 from .automod import AutoMod
 
-def setup(bot):
-    bot.add_cog(AutoMod(bot))
+async def setup(bot):
+    cog = AutoMod(bot)
+    await bot.add_cog(cog)
