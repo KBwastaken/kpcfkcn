@@ -1,16 +1,16 @@
 import discord
 import asyncio
+import os
 from datetime import datetime, timedelta
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import bold, box
 import logging
-import os
 
 log = logging.getLogger("red.automod")
 
 class AutoMod(commands.Cog):
-    """Automod integration with custom word list system."""
+    """Automod integration with Discord AutoMod system."""
 
     def __init__(self, bot: Red):
         self.bot = bot
@@ -34,28 +34,27 @@ class AutoMod(commands.Cog):
         self.max_warnings = 3
         self.muted_role_name = "KCN | Muted"
 
-        # Load blocked words from a file
+        # Load blocked words from the external file
         self.blocked_words = self.load_blocked_words()
 
-def load_blocked_words(self):
-    """Load blocked words from a file."""
-    blocked_words = set()
-    try:
-        file_path = "automod/blocked_words.txt"  # Adjusted path to the file
-        if not os.path.exists(file_path):
-            log.error(f"{file_path} not found.")
-            return blocked_words
+    def load_blocked_words(self):
+        """Load blocked words from a file."""
+        blocked_words = set()
+        try:
+            file_path = "automod/blocked_words.txt"  # Adjust this path as necessary
+            if not os.path.exists(file_path):
+                log.error(f"{file_path} not found.")
+                return blocked_words
 
-        with open(file_path, "r", encoding="utf-8") as file:
-            for line in file:
-                word = line.strip().lower()  # Remove any extra whitespace or newlines
-                if word:  # Avoid adding empty lines
-                    blocked_words.add(word)
-    except Exception as e:
-        log.error(f"Error loading blocked words: {e}")
-    
-    return blocked_words
-
+            with open(file_path, "r", encoding="utf-8") as file:
+                for line in file:
+                    word = line.strip().lower()  # Remove any extra whitespace or newlines
+                    if word:  # Avoid adding empty lines
+                        blocked_words.add(word)
+        except Exception as e:
+            log.error(f"Error loading blocked words: {e}")
+        
+        return blocked_words
 
     # ------------------- Event Listener -------------------
 
@@ -146,8 +145,9 @@ def load_blocked_words(self):
 
     @automod.command()
     async def setup(self, ctx: commands.Context):
-        """Walks through the automod setup."""
-        # Walkthrough the other settings (alert channel, mod roles, etc.)
+        """Walks through the automod setup and enables Discord's automod."""
+        await self.setup_automod(ctx)
+
         await ctx.send("Enter the alert channel (mention it):")
         try:
             msg = await self.bot.wait_for("message", timeout=60, check=lambda m: m.author == ctx.author)
@@ -178,6 +178,12 @@ def load_blocked_words(self):
 
         await self.config.guild(ctx.guild).muted_role.set(muted_role.id)
         await ctx.send("Setup complete!")
+
+    @automod.command()
+    async def resetconfig(self, ctx: commands.Context):
+        """Reset all configuration."""
+        await self.config.guild(ctx.guild).clear()
+        await ctx.send("Configuration reset.")
 
     # ------------------- Utility Commands -------------------
 
