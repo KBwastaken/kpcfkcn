@@ -35,15 +35,25 @@ class AutoMod(commands.Cog):
         self.max_warnings = 3
         self.muted_role_name = "KCN | Muted"
 
+        # Blocked words and exceptions
+        self.blocked_words = set([  # These words should be blocked by Discord's AutoMod, not manually added.
+            "dildo", "fuck", "fucking", "shit", "shitty", "damn", "bitch", "bullshit"
+        ])
+
     # ------------------- Event Listener -------------------
 
     @commands.Cog.listener()
-    async def on_auto_moderation_action(self, action: discord.AutoModActionExecution):
-        """Handles actions taken by AutoMod"""
+    async def on_auto_moderation_action(self, action: discord.AutoModAction):
+        """Handle AutoMod actions."""
         user = action.user
+        reason = action.rule_name or "AutoMod violation"
+
+        await self.add_warning(user, reason)
+
+        # AutoMod Violations
         if action.action_type == discord.AutoModActionType.block_message:
-            reason = action.rule_name if action.rule_name else "Blocked message due to AutoMod"
-            await self.add_warning(user, reason)
+            await self.send_alert(action.guild, f"Blocked message from {user.mention} due to: {reason}")
+            await self.add_warning(user, "Blocked message due to: " + reason)
 
     # ------------------- Warning System -------------------
 
@@ -160,28 +170,24 @@ class AutoMod(commands.Cog):
         guild = ctx.guild
         try:
             automod = guild.auto_moderation
-
-            # Set block mention spam limit (block messages with more than 15 mentions)
+            # Set block mention spam limit
             await automod.add_rule(
                 name="Block Mention Spam",
                 actions=[discord.AutoModActionType.block_message],
                 filters=[discord.AutoModActionFilter.mention_count(max_mentions=15)]
             )
-
-            # Enable mention raid detection (block messages with more than 5 mentions)
+            # Enable mention raid detection
             await automod.add_rule(
                 name="Enable Mention Raid",
                 actions=[discord.AutoModActionType.block_message],
                 filters=[discord.AutoModActionFilter.mention_count(max_mentions=5)]
             )
-
-            # Block commonly flagged words using Discord's built-in AutoMod system
+            # Block commonly flagged words
             await automod.add_rule(
                 name="Block Commonly Flagged Words",
                 actions=[discord.AutoModActionType.block_message],
-                filters=[discord.AutoModActionFilter.content()]
+                filters=[discord.AutoModActionFilter.content(words=self.blocked_words)]
             )
-
         except Exception as e:
             log.error(f"Error setting up automod: {e}")
             await ctx.send(f"Failed to set up automod: {e}")
