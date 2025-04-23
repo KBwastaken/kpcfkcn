@@ -83,13 +83,15 @@ class AutoMod(commands.Cog):
         warnings.append(warning_entry)
         await self.config.user(user).warnings.set(warnings)
 
-        embed = discord.Embed(
-            title="⚠️ Warning: Blocked Word Usage",
-            description=f"Hello {user.name},\n\nfYou used a blocked word: **{reason.split(': ')[-1]}**",\nPlease refrain from using inappropriate language.\n\nIf you think this is a mistake, feel free to DM the bot with your concern.",
-            color=discord.Color.orange()
-        )
-        embed.add_field(name="Message", value=original_message.content if original_message else "Unknown", inline=False)
-        embed.set_footer(text="Automod System | Please contact a moderator if you need assistance.")
+        try:
+            embed = discord.Embed(
+                title="⚠️ Warning: Blocked Word Usage",
+                description=f"You used a blocked word: **{reason.split(': ')[-1]}**",
+                color=discord.Color.orange(),
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Message", value=original_message.content if original_message else "Unknown", inline=False)
+            embed.set_footer(text="Automod Violation | If you think this is a mistake, please reply to this DM to contact moderators.")
             await user.send(embed=embed)
         except discord.Forbidden:
             pass
