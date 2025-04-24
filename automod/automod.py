@@ -60,7 +60,9 @@ class AutoMod(commands.Cog):
             return
 
         lowered = message.content.lower()
-        if any(word in lowered.split() for word in self.blocked_words):
+        words = lowered.split()
+
+        if any(word in words for word in self.blocked_words):
             immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
             if immune_role and immune_role in message.author.roles:
                 return
@@ -71,19 +73,25 @@ class AutoMod(commands.Cog):
                 pass
             await self.add_warning(message.guild, message.author, "Blocked word usage", message.content)
             await self.send_alert(message.guild, message.author, message.content)
+            await self.send_dm(message.guild, message.author, message.content)
 
     # ------------------- Warning System -------------------
 
     async def add_warning(self, guild: discord.Guild, user: discord.Member, reason: str, original_message: str):
         now = datetime.utcnow()
-        warnings = await self.config.member(guild, user).warnings()
+        warnings = await self.config.member(user).warnings()
 
         warnings = [w for w in warnings if datetime.fromisoformat(w["timestamp"]) + timedelta(days=self.warning_expiry_days) > now]
 
         warning_entry = {"reason": reason, "timestamp": now.isoformat(), "content": original_message}
         warnings.append(warning_entry)
-        await self.config.member(guild, user).warnings.set(warnings)
+        await self.config.member(user).warnings.set(warnings)
 
+        if len(warnings) >= self.max_warnings:
+            await self.global_mute(user)
+            await self.send_warning_embed(guild, user, warnings)
+
+    async def send_dm(self, guild: discord.Guild, user: discord.Member, original_message: str):
         embed = discord.Embed(
             title="Warning: Blocked Word Usage",
             description=f"You used a blocked word in **{guild.name}**.",
@@ -96,10 +104,6 @@ class AutoMod(commands.Cog):
             await user.send(embed=embed)
         except discord.Forbidden:
             pass
-
-        if len(warnings) >= self.max_warnings:
-            await self.global_mute(user)
-            await self.send_warning_embed(guild, user, warnings)
 
     async def send_warning_embed(self, guild: discord.Guild, user: discord.Member, warnings: list):
         alert_channel_id = await self.config.guild(guild).alert_channel()
@@ -198,7 +202,7 @@ class AutoMod(commands.Cog):
     @commands.command()
     async def warnings(self, ctx: commands.Context, user: discord.Member):
         """Check a user's warnings."""
-        warnings = await self.config.member(ctx.guild, user).warnings()
+        warnings = await self.config.member(user).warnings()
         if not warnings:
             return await ctx.send("No warnings.")
         msg = "\n".join(f"{i+1}. {w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>" for i, w in enumerate(warnings))
@@ -208,7 +212,7 @@ class AutoMod(commands.Cog):
     @commands.command()
     async def clearwarns(self, ctx: commands.Context, user: discord.Member):
         """Clear a user's warnings."""
-        await self.config.member(ctx.guild, user).warnings.set([])
+        await self.config.member(user).warnings.set([])
         await ctx.send(f"Cleared warnings for {user.mention}.")
 
     @commands.has_permissions(moderate_members=True)
