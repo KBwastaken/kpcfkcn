@@ -29,11 +29,14 @@ class AlyaCog(commands.Cog):
         # Negative phrases to check for
         negative_keywords = ["sucks", "is bad", "overrated", "worst", "hate", "terrible", "annoying"]
 
-        # Check if any of the Alya-related names are in the message
-        if any(keyword.lower() in message.content.lower() for keyword in alya_keywords):
+        # Convert message content to lowercase to make it case-insensitive
+        message_content = message.content.lower()
+
+        # Check if any of the Alya-related names are in the message (case-insensitive)
+        if any(keyword.lower() in message_content for keyword in alya_keywords):
             print("Alya-related keyword detected.")
-            # Check if any negative keywords are in the message
-            if any(negative_keyword in message.content.lower() for negative_keyword in negative_keywords):
+            # Check if any negative keywords are in the message (case-insensitive)
+            if any(negative_keyword in message_content for negative_keyword in negative_keywords):
                 print("Negative keyword detected.")
                 # Random choice for additional "shit talking" responses
                 shit_talk_responses = [
