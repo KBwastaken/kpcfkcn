@@ -11,9 +11,6 @@ class RoleManager(commands.Cog):
         self.tree = bot.tree
         self.rolelocked_users = set()
 
-    async def cog_load(self):
-        await self.sync_slash_commands()
-
     async def sync_slash_commands(self):
         self.tree.clear_commands(guild=None)
         self.tree.add_command(self.assignrole)
