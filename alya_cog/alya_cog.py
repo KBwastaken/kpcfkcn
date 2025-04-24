@@ -30,26 +30,28 @@ class AlyaCog(commands.Cog):
             # Negative phrases to check for
             negative_keywords = ["sucks", "is bad", "overrated", "worst", "hate", "terrible", "annoying"]
 
+            # Compare "better than Alya" for negative comparisons
+            comparisons = ["better than Alya"]
+
             # Convert message content to lowercase to make it case-insensitive
             message_content = message.content.lower()
 
             # Check if any of the Alya-related names are in the message (case-insensitive)
             if any(keyword.lower() in message_content for keyword in alya_keywords):
                 print("Alya-related keyword detected.")
-                # Check if any negative keywords are in the message (case-insensitive)
-                if any(negative_keyword in message_content for negative_keyword in negative_keywords):
-                    print("Negative keyword detected.")
-                    # Random choice for additional "shit talking" responses
-                    shit_talk_responses = [
-                        "Wow you're shit talking about Alya? Why don't I shit talk about you?",
-                        "Rumors...",
-                        "Are you really talking bad about Alya? That's kinda low.",
-                        "Why disrespect her like that? You should be better than that.",
-                        "Alya doesn't deserve this hate. Think about that next time.",
-                        "Come on, we know you secretly love Alya. Stop pretending.",
-                        "Alya's kindness isn't something you can tear down with words."
+                
+                # Check if the message contains any "better than Alya" comparisons (case-insensitive)
+                if any(comparison in message_content for comparison in comparisons):
+                    print("Negative comparison detected.")
+                    # Response if another character is being compared as better than Alya
+                    negative_comparison_responses = [
+                        "Are you really comparing Alya to someone else? No one is as unique as her!",
+                        "Alya is a queen. There’s no one like her!",
+                        "Comparing Alya to others? She's in a class of her own!",
+                        "No one can top Alya, she's the best!",
+                        "Nope, Alya is irreplaceable. You can't compare her to anyone!"
                     ]
-                    response = random.choice(shit_talk_responses)
+                    response = random.choice(negative_comparison_responses)
 
                     # React with a red X
                     await message.add_reaction("❌")
@@ -57,27 +59,49 @@ class AlyaCog(commands.Cog):
                     # Send a reply to the original message
                     await message.reply(response)
                 else:
-                    print("No negative keywords detected.")
-                    # Positive responses if no negative keywords
-                    positive_responses = [
-                        "I agree! Alya's best girl!",
-                        "W comment! Alya's a queen!",
-                        "W series, am I right? Alya is iconic.",
-                        "Alya's amazing, no cap!",
-                        "Great taste in characters, Alya is a queen.",
-                        "Alya deserves all the love. She's underrated.",
-                        "She's a total legend in the series. Can't hate her!",
-                        "100% agree, Alya is flawless.",
-                        "Totally! Alya is one of the most well-written characters.",
-                        "Facts! Alya is a gem."
-                    ]
-                    response = random.choice(positive_responses)
+                    print("No negative comparison detected.")
+                    # Check if any negative keywords are in the message (case-insensitive)
+                    if any(negative_keyword in message_content for negative_keyword in negative_keywords):
+                        print("Negative keyword detected.")
+                        # Random choice for additional "shit talking" responses
+                        shit_talk_responses = [
+                            "Wow you're shit talking about Alya? Why don't I shit talk about you?",
+                            "Rumors...",
+                            "Are you really talking bad about Alya? That's kinda low.",
+                            "Why disrespect her like that? You should be better than that.",
+                            "Alya doesn't deserve this hate. Think about that next time.",
+                            "Come on, we know you secretly love Alya. Stop pretending.",
+                            "Alya's kindness isn't something you can tear down with words."
+                        ]
+                        response = random.choice(shit_talk_responses)
 
-                    # React with a green checkmark
-                    await message.add_reaction("✅")
-                    
-                    # Send a reply to the original message
-                    await message.reply(response)
+                        # React with a red X
+                        await message.add_reaction("❌")
+                        
+                        # Send a reply to the original message
+                        await message.reply(response)
+                    else:
+                        print("No negative keywords detected.")
+                        # Positive responses if no negative keywords or comparisons
+                        positive_responses = [
+                            "I agree! Alya's best girl!",
+                            "W comment! Alya's a queen!",
+                            "W series, am I right? Alya is iconic.",
+                            "Alya's amazing, no cap!",
+                            "Great taste in characters, Alya is a queen.",
+                            "Alya deserves all the love. She's underrated.",
+                            "She's a total legend in the series. Can't hate her!",
+                            "100% agree, Alya is flawless.",
+                            "Totally! Alya is one of the most well-written characters.",
+                            "Facts! Alya is a gem."
+                        ]
+                        response = random.choice(positive_responses)
+
+                        # React with a green checkmark
+                        await message.add_reaction("✅")
+                        
+                        # Send a reply to the original message
+                        await message.reply(response)
         except Exception as e:
             # Log the error if something goes wrong
             print(f"Error occurred: {e}")
