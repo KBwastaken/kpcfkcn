@@ -117,7 +117,7 @@ class AutoMod(commands.Cog):
         try:
             embed = discord.Embed(
                 title="You Have Been Muted",
-                description=("You have received 3 warnings for using blocked words. As a result, you have been muted in this server.\n\n"
+                description=("You have received 3 warnings for using blocked words. As a result, you have been muted Globally.\n\n"
                              "You will remain muted until a moderator reviews your case and contacts you."),
                 color=discord.Color.dark_red()
             )
