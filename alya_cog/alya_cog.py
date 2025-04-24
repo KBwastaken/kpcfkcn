@@ -43,21 +43,28 @@ class AlyaCog(commands.Cog):
                 # Check if the message contains any "better than Alya" comparisons (case-insensitive)
                 if any(comparison in message_content for comparison in comparisons):
                     print("Negative comparison detected.")
-                    # Response if another character is being compared as better than Alya
-                    negative_comparison_responses = [
-                        "Are you really comparing Alya to someone else? No one is as unique as her!",
-                        "Alya is a queen. There’s no one like her!",
-                        "Comparing Alya to others? She's in a class of her own!",
-                        "No one can top Alya, she's the best!",
-                        "Nope, Alya is irreplaceable. You can't compare her to anyone!"
-                    ]
-                    response = random.choice(negative_comparison_responses)
+                    # Check for specific character comparisons
+                    if 'yuki' in message_content or 'masha' in message_content:
+                        # Response if another character is being compared as better than Alya
+                        negative_comparison_responses = [
+                            "Are you really comparing Alya to someone else? No one is as unique as her!",
+                            "Alya is a queen. There’s no one like her!",
+                            "Comparing Alya to others? She's in a class of her own!",
+                            "No one can top Alya, she's the best!",
+                            "Nope, Alya is irreplaceable. You can't compare her to anyone!"
+                        ]
+                        response = random.choice(negative_comparison_responses)
 
-                    # React with a red X
-                    await message.add_reaction("❌")
-                    
-                    # Send a reply to the original message
-                    await message.reply(response)
+                        # React with a red X
+                        await message.add_reaction("❌")
+                        
+                        # Send a reply to the original message
+                        await message.reply(response)
+                    else:
+                        # If no specific character, give a more general response
+                        response = "No one is better than Alya. She's the best!"
+                        await message.add_reaction("❌")
+                        await message.reply(response)
                 else:
                     print("No negative comparison detected.")
                     # Check if any negative keywords are in the message (case-insensitive)
