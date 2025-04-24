@@ -63,7 +63,6 @@ class AutoMod(commands.Cog):
             return
 
         lowered = message.content.lower()
-        words = lowered.split()
 
         if any(word in lowered for word in self.blocked_words):
             immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
@@ -90,10 +89,12 @@ class AutoMod(commands.Cog):
         warnings.append(warning_entry)
         await self.config.member(user).warnings.set(warnings)
 
+        await self.send_dm(guild, user, original_message)
+
         if len(warnings) >= self.max_warnings:
+            await self.send_mute_dm(user)
             await self.global_mute(user)
             await self.send_warning_embed(guild, user, warnings)
-            await self.send_mute_dm(user)
 
     async def send_dm(self, guild: discord.Guild, user: discord.Member, original_message: str):
         try:
@@ -103,9 +104,9 @@ class AutoMod(commands.Cog):
                 title="⚠️ Warning: Blocked Word Usage",
                 color=discord.Color.red()
             )
-            embed.add_field(name="You used a blocked word:", value=blocked_word, inline=False)
+            embed.add_field(name="Blocked Word Detected", value=blocked_word, inline=False)
             embed.add_field(name="Message", value=box(original_message), inline=False)
-            embed.set_footer(text="If you think this is a mistake, please reply to this DM to contact moderators.")
+            embed.set_footer(text="If you believe this is a mistake, please reply to this DM to contact the moderators.")
 
             await user.send(embed=embed)
         except discord.Forbidden:
@@ -114,11 +115,12 @@ class AutoMod(commands.Cog):
     async def send_mute_dm(self, user: discord.Member):
         try:
             embed = discord.Embed(
-                title="⛔ You Have Been Muted",
-                description="You have received 3 warnings and have been muted until a moderator contacts you.",
+                title="You Have Been Muted",
+                description=("You have received 3 warnings for using blocked words. As a result, you have been muted in this server.\n\n"
+                             "You will remain muted until a moderator reviews your case and contacts you."),
                 color=discord.Color.dark_red()
             )
-            embed.set_footer(text="Please wait for a moderator to reach out.")
+            embed.set_footer(text="Please wait patiently for a moderator to reach out to you.")
             await user.send(embed=embed)
         except discord.Forbidden:
             pass
@@ -134,12 +136,12 @@ class AutoMod(commands.Cog):
             return
 
         embed = discord.Embed(
-            title=f"{user} reached {self.max_warnings} warnings",
+            title=f"Warning Threshold Reached: {user}",
             color=discord.Color.red()
         )
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
         for i, w in enumerate(warnings, 1):
-            embed.add_field(name=f"Warning {i}", value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>\n**Message:** {w['content']}", inline=False)
+            embed.add_field(name=f"Warning {i}", value=f"Reason: {w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>\nMessage: {w['content']}", inline=False)
         embed.set_footer(text=f"User ID: {user.id}")
 
         allowed_mentions = discord.AllowedMentions(roles=True, users=True, everyone=False)
@@ -274,4 +276,11 @@ class AutoMod(commands.Cog):
         if alert_channel_id:
             alert_channel = guild.get_channel(alert_channel_id)
             if alert_channel:
-                await alert_channel.send(f"{user.mention} used a blocked word.\n**Message:** {box(original_message)}")
+                embed = discord.Embed(
+                    title=f"Blocked Word Alert — {user}",
+                    description="User has sent a message containing a blocked word.",
+                    color=discord.Color.orange()
+                )
+                embed.add_field(name="Message Content", value=box(original_message), inline=False)
+                embed.set_footer(text=f"User ID: {user.id}")
+                await alert_channel.send(embed=embed)
