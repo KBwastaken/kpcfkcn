@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import random
 
-class AlyaCog(commands.Cog):
+class AlyaCog(commands.Cog):  # Ensure the class inherits from commands.Cog
     def __init__(self, bot):
         self.bot = bot
 
@@ -58,5 +58,5 @@ class AlyaCog(commands.Cog):
                 await message.channel.send(response)
 
 # Setup function to add the cog to the bot
-def setup(bot):
-    bot.add_cog(AlyaCog(bot))
+async def setup(bot):
+    await bot.add_cog(AlyaCog(bot))
