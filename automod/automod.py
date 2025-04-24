@@ -52,8 +52,6 @@ class AutoMod(commands.Cog):
             log.error(f"JSON error in blocked_words.txt: {e}")
             return []
 
-    # ------------------- Event Listener -------------------
-
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.guild or message.author.bot:
@@ -73,11 +71,9 @@ class AutoMod(commands.Cog):
                 await message.delete()
             except discord.Forbidden:
                 pass
+
             await self.add_warning(message.guild, message.author, "Blocked word usage", message.content)
             await self.send_alert(message.guild, message.author, message.content)
-            await self.send_dm(message.guild, message.author, message.content)
-
-    # ------------------- Warning System -------------------
 
     async def add_warning(self, guild: discord.Guild, user: discord.Member, reason: str, original_message: str):
         now = datetime.utcnow()
@@ -89,24 +85,29 @@ class AutoMod(commands.Cog):
         warnings.append(warning_entry)
         await self.config.member(user).warnings.set(warnings)
 
-        await self.send_dm(guild, user, original_message)
+        warn_count = len(warnings)
+        await self.send_dm(guild, user, original_message, warn_count)
 
-        if len(warnings) >= self.max_warnings:
+        if warn_count >= self.max_warnings:
             await self.send_mute_dm(user)
             await self.global_mute(user)
             await self.send_warning_embed(guild, user, warnings)
 
-    async def send_dm(self, guild: discord.Guild, user: discord.Member, original_message: str):
+    async def send_dm(self, guild: discord.Guild, user: discord.Member, original_message: str, warn_count: int):
         try:
             blocked_word = next((bw for bw in self.blocked_words if bw in original_message.lower()), "a blocked word")
 
             embed = discord.Embed(
-                title="⚠️ Warning: Blocked Word Usage",
-                color=discord.Color.red()
+                title=f"⚠️ Warning #{warn_count}: Blocked Word Usage",
+                color=discord.Color.orange() if warn_count < self.max_warnings else discord.Color.red()
             )
             embed.add_field(name="Blocked Word Detected", value=blocked_word, inline=False)
             embed.add_field(name="Message", value=box(original_message), inline=False)
-            embed.set_footer(text="If you believe this is a mistake, please reply to this DM to contact the moderators.")
+
+            if warn_count < self.max_warnings:
+                embed.set_footer(text=f"This is warning {warn_count}/{self.max_warnings}. Continued violations may lead to a mute.")
+            else:
+                embed.set_footer(text="You've hit the max warnings and are being muted.")
 
             await user.send(embed=embed)
         except discord.Forbidden:
@@ -150,8 +151,6 @@ class AutoMod(commands.Cog):
 
         await alert_channel.send(content=content, embed=embed, allowed_mentions=allowed_mentions)
 
-    # ------------------- Mute System -------------------
-
     async def global_mute(self, user: discord.User):
         for guild in self.bot.guilds:
             role_id = await self.config.guild(guild).muted_role()
@@ -166,8 +165,6 @@ class AutoMod(commands.Cog):
                     await member.add_roles(role, reason="Reached 3 warnings")
                 except discord.Forbidden:
                     pass
-
-    # ------------------- Setup Command -------------------
 
     @commands.is_owner()
     @commands.guild_only()
@@ -225,8 +222,6 @@ class AutoMod(commands.Cog):
         state_text = "enabled" if new_state else "disabled"
         await ctx.send(f"Automod has been {state_text}.")
 
-    # ------------------- Utility Commands -------------------
-
     @commands.has_permissions(manage_guild=True)
     @commands.command()
     async def warnings(self, ctx: commands.Context, user: discord.Member):
@@ -271,7 +266,6 @@ class AutoMod(commands.Cog):
         await ctx.send(f"{user.mention} has been unmuted in all shared servers.")
 
     async def send_alert(self, guild: discord.Guild, user: discord.Member, original_message: str):
-        """Send alert in the configured alerts channel."""
         alert_channel_id = await self.config.guild(guild).alert_channel()
         if alert_channel_id:
             alert_channel = guild.get_channel(alert_channel_id)
