@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from redbot.core import commands
 import random
 
 class AlyaCog(commands.Cog):
@@ -73,6 +73,3 @@ class AlyaCog(commands.Cog):
         else:
             await ctx.send("Please use 'true'/'false', 'enable'/'disable', or 'on'/'off' to toggle the responder.")
 
-# Setup function to add the cog to the bot
-async def setup(bot):
-    await bot.add_cog(AlyaCog(bot))
