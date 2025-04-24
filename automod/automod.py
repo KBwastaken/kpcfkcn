@@ -8,6 +8,7 @@ from redbot.core.utils.chat_formatting import bold, box
 import logging
 import json
 import os
+import re
 
 log = logging.getLogger("red.automod")
 
@@ -60,13 +61,13 @@ class AutoMod(commands.Cog):
         if not await self.config.guild(message.guild).automod_enabled():
             return
 
-        lowered = message.content.lower()
+        immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
+        if immune_role and immune_role in message.author.roles:
+            return
 
-        if any(word in lowered for word in self.blocked_words):
-            immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
-            if immune_role and immune_role in message.author.roles:
-                return
-
+        # Word matching - avoids substrings like "night" for "nig"
+        words = re.findall(r"\b\w+\b", message.content.lower())
+        if any(word in self.blocked_words for word in words):
             try:
                 await message.delete()
             except discord.Forbidden:
@@ -117,7 +118,7 @@ class AutoMod(commands.Cog):
         try:
             embed = discord.Embed(
                 title="You Have Been Muted",
-                description=("You have received 3 warnings for using blocked words. As a result, you have been muted Globally.\n\n"
+                description=("You have received 3 warnings for using blocked words. As a result, you have been muted Glo.\n\n"
                              "You will remain muted until a moderator reviews your case and contacts you."),
                 color=discord.Color.dark_red()
             )
