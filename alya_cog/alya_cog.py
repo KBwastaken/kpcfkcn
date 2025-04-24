@@ -2,12 +2,16 @@ import discord
 from discord.ext import commands
 import random
 
-class AlyaCog(commands.Cog):  # Ensure the class inherits from commands.Cog
+class AlyaCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.messageresponder_enabled = False  # Default to disabled
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if not self.messageresponder_enabled:
+            return  # If the responder is disabled, do nothing
+
         # Ignore messages sent by the bot itself
         if message.author == self.bot.user:
             return
@@ -56,6 +60,18 @@ class AlyaCog(commands.Cog):  # Ensure the class inherits from commands.Cog
                 
                 # Send a positive reply
                 await message.channel.send(response)
+
+    @commands.command()
+    async def messageresponder(self, ctx, status: str):
+        """Enable or disable the message responder."""
+        if status.lower() in ['true', 'enable', 'on']:
+            self.messageresponder_enabled = True
+            await ctx.send("Message responder has been enabled.")
+        elif status.lower() in ['false', 'disable', 'off']:
+            self.messageresponder_enabled = False
+            await ctx.send("Message responder has been disabled.")
+        else:
+            await ctx.send("Please use 'true'/'false', 'enable'/'disable', or 'on'/'off' to toggle the responder.")
 
 # Setup function to add the cog to the bot
 async def setup(bot):
