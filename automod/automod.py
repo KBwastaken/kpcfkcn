@@ -4,11 +4,13 @@ from datetime import datetime, timedelta
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import bold, box
+
 import logging
 import json
 import os
 
 log = logging.getLogger("red.automod")
+
 
 class AutoMod(commands.Cog):
     """Automod integration with Discord AutoMod system."""
@@ -24,17 +26,16 @@ class AutoMod(commands.Cog):
             "automod_enabled": False,
         }
 
-        default_user = {
+        default_member = {
             "warnings": []
         }
 
         self.config.register_guild(**default_guild)
-        self.config.register_user(**default_user)
+        self.config.register_member(**default_member)
 
         self.warning_expiry_days = 14
         self.max_warnings = 3
         self.muted_role_name = "KCN | Muted"
-        self.protected_role_name = "KCN | Protected"
 
         self.blocked_words = self.load_blocked_words()
 
@@ -58,78 +59,72 @@ class AutoMod(commands.Cog):
         if not message.guild or message.author.bot:
             return
 
-        if any(role.name == self.protected_role_name for role in message.author.roles):
-            return
+        lowered = message.content.lower()
+        if any(word in lowered.split() for word in self.blocked_words):
+            immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
+            if immune_role and immune_role in message.author.roles:
+                return
 
-        lowered_words = message.content.lower().split()
-        if any(word in lowered_words for word in self.blocked_words):
             try:
                 await message.delete()
             except discord.Forbidden:
                 pass
-            matched_word = next(word for word in lowered_words if word in self.blocked_words)
-            await self.add_warning(message.author, f"Blocked word usage: {matched_word}", message)
-            await self.send_alert(message.guild, f"{message.author.mention} used a blocked word: `{matched_word}`")
+            await self.add_warning(message.guild, message.author, "Blocked word usage", message.content)
+            await self.send_alert(message.guild, message.author, message.content)
 
     # ------------------- Warning System -------------------
 
-    async def add_warning(self, user: discord.Member, reason: str, original_message=None):
+    async def add_warning(self, guild: discord.Guild, user: discord.Member, reason: str, original_message: str):
         now = datetime.utcnow()
-        warnings = await self.config.user(user).warnings()
+        warnings = await self.config.member(guild, user).warnings()
 
         warnings = [w for w in warnings if datetime.fromisoformat(w["timestamp"]) + timedelta(days=self.warning_expiry_days) > now]
 
-        warning_entry = {"reason": reason, "timestamp": now.isoformat()}
+        warning_entry = {"reason": reason, "timestamp": now.isoformat(), "content": original_message}
         warnings.append(warning_entry)
-        await self.config.user(user).warnings.set(warnings)
+        await self.config.member(guild, user).warnings.set(warnings)
+
+        embed = discord.Embed(
+            title="Warning: Blocked Word Usage",
+            description=f"You used a blocked word in **{guild.name}**.",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="What you said", value=box(original_message), inline=False)
+        embed.set_footer(text="If you think this is a mistake, DM the bot to appeal.")
 
         try:
-            embed = discord.Embed(
-                title="⚠️ Warning: Blocked Word Usage",
-                description=f"You used a blocked word: **{reason.split(': ')[-1]}**",
-                color=discord.Color.orange(),
-                timestamp=datetime.utcnow()
-            )
-            embed.add_field(name="Message", value=original_message.content if original_message else "Unknown", inline=False)
-            embed.set_footer(text="If you think this is a mistake, please reply to this DM to contact moderators.")
             await user.send(embed=embed)
         except discord.Forbidden:
             pass
 
         if len(warnings) >= self.max_warnings:
             await self.global_mute(user)
-            await self.send_warning_embed(user, warnings)
+            await self.send_warning_embed(guild, user, warnings)
 
-    async def send_warning_embed(self, user: discord.User, warnings: list):
-        for guild in self.bot.guilds:
-            alert_channel_id = await self.config.guild(guild).alert_channel()
-            mod_roles_ids = await self.config.guild(guild).mod_roles()
-            if not alert_channel_id:
-                continue
+    async def send_warning_embed(self, guild: discord.Guild, user: discord.Member, warnings: list):
+        alert_channel_id = await self.config.guild(guild).alert_channel()
+        mod_roles_ids = await self.config.guild(guild).mod_roles()
+        if not alert_channel_id:
+            return
 
-            alert_channel = guild.get_channel(alert_channel_id)
-            if not alert_channel:
-                continue
+        alert_channel = guild.get_channel(alert_channel_id)
+        if not alert_channel:
+            return
 
-            mod_roles = [guild.get_role(rid) for rid in mod_roles_ids if guild.get_role(rid)]
-            role_ping_text = " ".join(f"<@&{r.id}>" for r in mod_roles)
-            allowed_mentions = discord.AllowedMentions(roles=True, users=True, everyone=False)
+        embed = discord.Embed(
+            title=f"{user} reached {self.max_warnings} warnings",
+            color=discord.Color.red()
+        )
+        embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+        for i, w in enumerate(warnings, 1):
+            embed.add_field(name=f"Warning {i}", value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>", inline=False)
+        embed.set_footer(text=f"User ID: {user.id}")
 
-            embed = discord.Embed(
-                title=f"{user} reached {self.max_warnings} warnings",
-                color=discord.Color.red()
-            )
-            embed.set_author(name=str(user), icon_url=user.display_avatar.url)
-            for i, w in enumerate(warnings, 1):
-                embed.add_field(
-                    name=f"Warning {i}",
-                    value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>",
-                    inline=False
-                )
-            embed.set_footer(text=f"User ID: {user.id}")
+        allowed_mentions = discord.AllowedMentions(roles=True, users=True, everyone=False)
+        role_ping_text = " ".join(f"<@&{r}>" for r in mod_roles_ids)
+        content = f"{user.mention} {role_ping_text}"
 
-            content = f"{user.mention} {role_ping_text}"
-            await alert_channel.send(content=content, embed=embed, allowed_mentions=allowed_mentions)
+        await alert_channel.send(content=content, embed=embed, allowed_mentions=allowed_mentions)
 
     # ------------------- Mute System -------------------
 
@@ -159,7 +154,7 @@ class AutoMod(commands.Cog):
 
     @automod.command()
     async def setup(self, ctx: commands.Context):
-        """Walks through the automod setup (without Discord AutoMod API)."""
+        """Walks through the automod setup."""
         await ctx.send("Enter the alert channel (mention it):")
         try:
             msg = await self.bot.wait_for("message", timeout=60, check=lambda m: m.author == ctx.author)
@@ -199,10 +194,34 @@ class AutoMod(commands.Cog):
 
     # ------------------- Utility Commands -------------------
 
+    @commands.has_permissions(manage_guild=True)
+    @commands.command()
+    async def warnings(self, ctx: commands.Context, user: discord.Member):
+        """Check a user's warnings."""
+        warnings = await self.config.member(ctx.guild, user).warnings()
+        if not warnings:
+            return await ctx.send("No warnings.")
+        msg = "\n".join(f"{i+1}. {w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>" for i, w in enumerate(warnings))
+        await ctx.send(box(msg))
+
+    @commands.has_permissions(manage_guild=True)
+    @commands.command()
+    async def clearwarns(self, ctx: commands.Context, user: discord.Member):
+        """Clear a user's warnings."""
+        await self.config.member(ctx.guild, user).warnings.set([])
+        await ctx.send(f"Cleared warnings for {user.mention}.")
+
+    @commands.has_permissions(moderate_members=True)
+    @commands.command()
+    async def smute(self, ctx: commands.Context, user: discord.User):
+        """Globally mute a user."""
+        await self.global_mute(user)
+        await ctx.send(f"{user.mention} has been muted in all shared servers.")
+
     @commands.has_permissions(moderate_members=True)
     @commands.command()
     async def sunmute(self, ctx: commands.Context, user: discord.User):
-        """Globally unmute a user (requires timeout permissions)."""
+        """Globally unmute a user."""
         for guild in self.bot.guilds:
             role_id = await self.config.guild(guild).muted_role()
             if not role_id:
@@ -218,39 +237,10 @@ class AutoMod(commands.Cog):
                     continue
         await ctx.send(f"{user.mention} has been unmuted in all shared servers.")
 
-    @commands.is_owner()
-    @commands.command()
-    async def smute(self, ctx: commands.Context, user: discord.User):
-        """Globally mute a user."""
-        await self.global_mute(user)
-        await ctx.send(f"{user.mention} has been muted in all shared servers.")
-
-    @commands.has_permissions(manage_guild=True)
-    @commands.guild_only()
-    @commands.command()
-    async def warnings(self, ctx: commands.Context, user: discord.User):
-        """Check a user's warnings (requires Manage Server)."""
-        warnings = await self.config.user(user).warnings()
-        if not warnings:
-            return await ctx.send("No warnings.")
-        msg = "\n".join(
-            f"{i+1}. {w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>"
-            for i, w in enumerate(warnings)
-        )
-        await ctx.send(box(msg))
-
-    @commands.has_permissions(manage_guild=True)
-    @commands.guild_only()
-    @commands.command()
-    async def clearwarns(self, ctx: commands.Context, user: discord.User):
-        """Clear a user's warnings (requires Manage Server)."""
-        await self.config.user(user).warnings.set([])
-        await ctx.send(f"Cleared warnings for {user.mention}.")
-
-    async def send_alert(self, guild: discord.Guild, message: str):
+    async def send_alert(self, guild: discord.Guild, user: discord.Member, original_message: str):
         """Send alert in the configured alerts channel."""
         alert_channel_id = await self.config.guild(guild).alert_channel()
         if alert_channel_id:
             alert_channel = guild.get_channel(alert_channel_id)
             if alert_channel:
-                await alert_channel.send(message)
+                await alert_channel.send(f"{user.mention} used a blocked word.\n**Message:** {box(original_message)}")
