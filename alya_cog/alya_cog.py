@@ -16,6 +16,9 @@ class AlyaCog(commands.Cog):
         if message.author == self.bot.user:
             return
 
+        # Debug: Print the message content to the logs
+        print(f"Message received: {message.content}")
+
         # List of possible Alya-related phrases
         alya_keywords = [
             "Alya", "Alisa", "Alisa Mikhailovna", "Alisa Mikhailovna Kujou", 
@@ -25,41 +28,52 @@ class AlyaCog(commands.Cog):
         
         # Negative phrases to check for
         negative_keywords = ["sucks", "is bad", "overrated", "worst", "hate", "terrible", "annoying"]
-        
+
         # Check if any of the Alya-related names are in the message
-        if any(keyword in message.content for keyword in alya_keywords):
+        if any(keyword.lower() in message.content.lower() for keyword in alya_keywords):
+            print("Alya-related keyword detected.")
             # Check if any negative keywords are in the message
             if any(negative_keyword in message.content.lower() for negative_keyword in negative_keywords):
+                print("Negative keyword detected.")
                 # Random choice for additional "shit talking" responses
                 shit_talk_responses = [
                     "Wow you're shit talking about Alya? Why don't I shit talk about you?",
                     "Rumors...",
                     "Are you really talking bad about Alya? That's kinda low.",
-                    "Why disrespect her like that? You should be better than that."
+                    "Why disrespect her like that? You should be better than that.",
+                    "Alya doesn't deserve this hate. Think about that next time.",
+                    "Come on, we know you secretly love Alya. Stop pretending.",
+                    "Alya's kindness isn't something you can tear down with words."
                 ]
                 response = random.choice(shit_talk_responses)
 
                 # React with a red X
                 await message.add_reaction("❌")
                 
-                # Send a reply
-                await message.channel.send(response)
+                # Send a reply to the original message
+                await message.reply(response)
             else:
+                print("No negative keywords detected.")
                 # Positive responses if no negative keywords
                 positive_responses = [
-                    "I agree!",
-                    "W comment!",
-                    "W series, am I right?",
+                    "I agree! Alya's best girl!",
+                    "W comment! Alya's a queen!",
+                    "W series, am I right? Alya is iconic.",
                     "Alya's amazing, no cap!",
-                    "Great taste in characters, Alya is a queen."
+                    "Great taste in characters, Alya is a queen.",
+                    "Alya deserves all the love. She's underrated.",
+                    "She's a total legend in the series. Can't hate her!",
+                    "100% agree, Alya is flawless.",
+                    "Totally! Alya is one of the most well-written characters.",
+                    "Facts! Alya is a gem."
                 ]
                 response = random.choice(positive_responses)
 
                 # React with a green checkmark
                 await message.add_reaction("✅")
                 
-                # Send a positive reply
-                await message.channel.send(response)
+                # Send a reply to the original message
+                await message.reply(response)
 
     @commands.command()
     async def messageresponder(self, ctx, status: str):
@@ -72,4 +86,3 @@ class AlyaCog(commands.Cog):
             await ctx.send("Message responder has been disabled.")
         else:
             await ctx.send("Please use 'true'/'false', 'enable'/'disable', or 'on'/'off' to toggle the responder.")
-
