@@ -30,8 +30,8 @@ class AlyaCog(commands.Cog):
             # Negative phrases to check for
             negative_keywords = ["sucks", "is bad", "overrated", "worst", "hate", "terrible", "annoying"]
 
-            # Compare "better than Alya" for negative comparisons
-            comparisons = ["better than Alya"]
+            # Specific character names for comparisons
+            comparisons = ["better than alya", "worse than alya", "not as good as alya"]
 
             # Convert message content to lowercase to make it case-insensitive
             message_content = message.content.lower()
@@ -40,31 +40,25 @@ class AlyaCog(commands.Cog):
             if any(keyword.lower() in message_content for keyword in alya_keywords):
                 print("Alya-related keyword detected.")
                 
-                # Check if the message contains any "better than Alya" comparisons (case-insensitive)
+                # Check if the message contains any comparison phrases (case-insensitive)
                 if any(comparison in message_content for comparison in comparisons):
                     print("Negative comparison detected.")
-                    # Check for specific character comparisons
-                    if 'yuki' in message_content or 'masha' in message_content:
-                        # Response if another character is being compared as better than Alya
-                        negative_comparison_responses = [
-                            "Are you really comparing Alya to someone else? No one is as unique as her!",
-                            "Alya is a queen. There’s no one like her!",
-                            "Comparing Alya to others? She's in a class of her own!",
-                            "No one can top Alya, she's the best!",
-                            "Nope, Alya is irreplaceable. You can't compare her to anyone!"
-                        ]
-                        response = random.choice(negative_comparison_responses)
+                    
+                    # Response if another character is being compared as better than Alya
+                    negative_comparison_responses = [
+                        "Alya is a queen. There's no comparison!",
+                        "Comparing Alya to someone else? No one is as unique as her!",
+                        "Alya is irreplaceable. No one can top her!",
+                        "Nope, Alya is the best, you can't compare her to anyone.",
+                        "No one can surpass Alya, she’s the ultimate best girl!"
+                    ]
+                    response = random.choice(negative_comparison_responses)
 
-                        # React with a red X
-                        await message.add_reaction("❌")
-                        
-                        # Send a reply to the original message
-                        await message.reply(response)
-                    else:
-                        # If no specific character, give a more general response
-                        response = "No one is better than Alya. She's the best!"
-                        await message.add_reaction("❌")
-                        await message.reply(response)
+                    # React with a red X
+                    await message.add_reaction("❌")
+                    
+                    # Send a reply to the original message
+                    await message.reply(response)
                 else:
                     print("No negative comparison detected.")
                     # Check if any negative keywords are in the message (case-insensitive)
