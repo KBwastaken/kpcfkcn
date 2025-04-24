@@ -59,10 +59,13 @@ class AutoMod(commands.Cog):
         if not message.guild or message.author.bot:
             return
 
+        if not await self.config.guild(message.guild).automod_enabled():
+            return
+
         lowered = message.content.lower()
         words = lowered.split()
 
-        if any(word in words for word in self.blocked_words):
+        if any(word in lowered for word in self.blocked_words):
             immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
             if immune_role and immune_role in message.author.roles:
                 return
@@ -90,17 +93,32 @@ class AutoMod(commands.Cog):
         if len(warnings) >= self.max_warnings:
             await self.global_mute(user)
             await self.send_warning_embed(guild, user, warnings)
+            await self.send_mute_dm(user)
 
     async def send_dm(self, guild: discord.Guild, user: discord.Member, original_message: str):
-        embed = discord.Embed(
-            title="Warning: Blocked Word Usage",
-            description=f"You used a blocked word in **{guild.name}**.",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="What you said", value=box(original_message), inline=False)
-        embed.set_footer(text="If you think this is a mistake, DM the bot to appeal.")
-
         try:
+            blocked_word = next((bw for bw in self.blocked_words if bw in original_message.lower()), "a blocked word")
+
+            embed = discord.Embed(
+                title="⚠️ Warning: Blocked Word Usage",
+                color=discord.Color.red()
+            )
+            embed.add_field(name="You used a blocked word:", value=blocked_word, inline=False)
+            embed.add_field(name="Message", value=box(original_message), inline=False)
+            embed.set_footer(text="If you think this is a mistake, please reply to this DM to contact moderators.")
+
+            await user.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
+    async def send_mute_dm(self, user: discord.Member):
+        try:
+            embed = discord.Embed(
+                title="⛔ You Have Been Muted",
+                description="You have received 3 warnings and have been muted until a moderator contacts you.",
+                color=discord.Color.dark_red()
+            )
+            embed.set_footer(text="Please wait for a moderator to reach out.")
             await user.send(embed=embed)
         except discord.Forbidden:
             pass
@@ -121,7 +139,7 @@ class AutoMod(commands.Cog):
         )
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
         for i, w in enumerate(warnings, 1):
-            embed.add_field(name=f"Warning {i}", value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>", inline=False)
+            embed.add_field(name=f"Warning {i}", value=f"{w['reason']} — <t:{int(datetime.fromisoformat(w['timestamp']).timestamp())}:R>\n**Message:** {w['content']}", inline=False)
         embed.set_footer(text=f"User ID: {user.id}")
 
         allowed_mentions = discord.AllowedMentions(roles=True, users=True, everyone=False)
@@ -195,6 +213,15 @@ class AutoMod(commands.Cog):
         """Reset all configuration."""
         await self.config.guild(ctx.guild).clear()
         await ctx.send("Configuration reset.")
+
+    @automod.command()
+    async def toggle(self, ctx: commands.Context):
+        """Toggle the automod on or off."""
+        current = await self.config.guild(ctx.guild).automod_enabled()
+        new_state = not current
+        await self.config.guild(ctx.guild).automod_enabled.set(new_state)
+        state_text = "enabled" if new_state else "disabled"
+        await ctx.send(f"Automod has been {state_text}.")
 
     # ------------------- Utility Commands -------------------
 
