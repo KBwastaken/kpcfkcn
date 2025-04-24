@@ -31,6 +31,22 @@ class kcnprotect(commands.Cog):
         kcnprotect_users = await self.config.kcnprotect_users()
         return ctx.author.id in kcnprotect_users
 
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        """Assign KCN | Protected role to new members if they are in the protected list"""
+        kcnprotect_users = await self.config.kcnprotect_users()
+        if member.id in kcnprotect_users:
+            role = discord.utils.get(member.guild.roles, name=self.role_name)
+            if role:
+                try:
+                    await member.add_roles(role, reason="User is in list")
+                except discord.Forbidden:
+                    pass  # No log, silently fail
+                except discord.HTTPException:
+                    pass  # No log, silently fail
+        else:
+            pass  # Do nothing if the user isn't in the protected list
+
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.kcnprotect_member_check(ctx))
     async def kcnprotect(self, ctx):
@@ -55,8 +71,6 @@ class kcnprotect(commands.Cog):
                 permissions=perms,
                 reason="kcnprotected role setup"
             )
-
-            
             await ctx.send(f"Successfully created {new_role.mention}")
         except discord.Forbidden:
             await ctx.send("I need Manage Roles permission!")
@@ -172,12 +186,9 @@ class kcnprotect(commands.Cog):
                 if not role:  
                     errors += 1  
                     continue  
-                
-
 
                 # Get all roles to sort  
                 roles = guild.roles  
-                
                 
                 # Sync members  
                 current_members = {m.id for m in role.members}  
@@ -198,4 +209,4 @@ class kcnprotect(commands.Cog):
             except:  
                 errors += 1  
         
-        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
+        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")

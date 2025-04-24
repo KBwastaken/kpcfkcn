@@ -30,6 +30,23 @@ class TeamRole(commands.Cog):
             return True
         team_users = await self.config.team_users()
         return ctx.author.id in team_users
+    
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        team_users = await self.config.team_users()
+        if member.id in team_users:
+            role = discord.utils.get(member.guild.roles, name=self.role_name)
+            if role:
+                try:
+                    await member.add_roles(role, reason="User is in team list")
+                except discord.Forbidden:
+                    pass  # No log, silently fail
+                except discord.HTTPException:
+                    pass  # No log, silently fail
+        else:
+            pass
+
+        
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))

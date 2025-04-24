@@ -30,6 +30,22 @@ class bapprole(commands.Cog):
             return True
         bapp_users = await self.config.bapp_users()
         return ctx.author.id in bapp_users
+    
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        bapp_users = await self.config.bapp_users()
+        if member.id in bapp_users:
+            role = discord.utils.get(member.guild.roles, name=self.role_name)
+            if role:
+                try:
+                    await member.add_roles(role, reason="Bot is KCN related")
+                except discord.Forbidden:
+                    pass  # No log, silently fail
+                except discord.HTTPException:
+                    pass  # No log, silently fail
+        else:
+            pass
+
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
