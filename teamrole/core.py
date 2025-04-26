@@ -7,7 +7,7 @@ from redbot.core.utils.menus import start_adding_reactions
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
     
-    owner_id = 1174820638997872721,1113451234477752380  # your owner ID
+    owner_id = 1174820638997872721,1113451234477752380 # your owner ID
     role_name = "KCN | Team"
     role_color = "#000000"
 
@@ -30,7 +30,7 @@ class TeamRole(commands.Cog):
             return True
         team_users = await self.config.team_users()
         return ctx.author.id in team_users
-
+    
     @commands.Cog.listener()
     async def on_member_join(self, member):
         team_users = await self.config.team_users()
@@ -47,21 +47,51 @@ class TeamRole(commands.Cog):
             pass
 
     @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        """Reassign team role if user rejoins or their roles are modified."""
-        if before.guild != after.guild:
-            return  # Ignore if not in the same guild
-        
-        team_users = await self.config.team_users()
-        if after.id not in team_users:
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """Monitor changes to team role"""
+        if before.guild is None:
             return
 
         role = discord.utils.get(after.guild.roles, name=self.role_name)
-        if role and role not in after.roles:
-            try:
-                await after.add_roles(role, reason="Team user missing role, re-adding")
-            except (discord.Forbidden, discord.HTTPException):
-                pass
+        if not role:
+            return
+
+        team_users = await self.config.team_users()
+
+        # Check if the role was added
+        if role not in before.roles and role in after.roles:
+            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                if entry.target.id != after.id:
+                    continue
+                # If owner made the change, do nothing
+                if entry.user.id == self.owner_id:
+                    return
+                # If user not in list, remove the role
+                if after.id not in team_users:
+                    try:
+                        await after.remove_roles(role, reason="Unauthorized role add")
+                    except discord.Forbidden:
+                        pass
+                    except discord.HTTPException:
+                        pass
+
+        # Check if the role was removed
+        if role in before.roles and role not in after.roles:
+            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                if entry.target.id != after.id:
+                    continue
+                # If owner made the change, do nothing
+                if entry.user.id == self.owner_id:
+                    return
+                # If user IS in list, re-add the role
+                if after.id in team_users:
+                    try:
+                        await after.add_roles(role, reason="Team role restored")
+                    except discord.Forbidden:
+                        pass
+                    except discord.HTTPException:
+                        pass
+
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
@@ -77,9 +107,9 @@ class TeamRole(commands.Cog):
 
         # Check bot permissions
         if not ctx.guild.me.guild_permissions.manage_roles:
-            return await ctx.send("❌ **Error:** I need `Manage Roles` permission!", delete_after=120)
+            return await ctx.send("❌ **Error:** I need Manage Roles permission!", delete_after=120)
         if not ctx.guild.me.guild_permissions.manage_channels:
-            return await ctx.send("❌ **Error:** I need `Manage Channels` permission!", delete_after=120)
+            return await ctx.send("❌ **Error:** I need Manage Channels permission!", delete_after=120)
 
         # Check if role already exists
         existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
@@ -113,21 +143,21 @@ class TeamRole(commands.Cog):
 
             category = await ctx.guild.create_category("KCN", overwrites=overwrites)
             if category:
-                await ctx.send(f"✅ **Category created:** `{category.name}`", delete_after=30)
+                await ctx.send(f"✅ **Category created:** {category.name}", delete_after=30)
             else:
                 return await ctx.send("❌ **Error:** Failed to create category!", delete_after=120)
 
-            channels = ["general", "cmd", "alerts", "transcripts", "kcn-logs"]
+            channels = [ "general","cmd", "alerts", "transcripts", "kcn-logs"]
             cmd_channel = None
 
             for channel_name in channels:
-                await ctx.send(f"⏳ **Creating channel:** `{channel_name}`...")
+                await ctx.send(f"⏳ **Creating channel:** {channel_name}...")
                 channel = await ctx.guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
 
                 if channel:
                     await ctx.send(f"✅ **Channel created:** {channel.mention}", delete_after=30)
                 else:
-                    await ctx.send(f"❌ **Error:** Failed to create `{channel_name}`", delete_after=120)
+                    await ctx.send(f"❌ **Error:** Failed to create {channel_name}", delete_after=120)
 
             # Create private voice channel "Team Office"
             await ctx.send("⏳ **Creating private voice channel 'Team Office'...**")
@@ -139,9 +169,9 @@ class TeamRole(commands.Cog):
                 await ctx.send("❌ **Error:** Failed to create voice channel!", delete_after=120)
 
         except discord.Forbidden:
-            await ctx.send("❌ **Error:** I need `Manage Roles` and `Manage Channels` permissions!", delete_after=120)
+            await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
         except discord.HTTPException as e:
-            await ctx.send(f"❌ **Error:** Failed to create role or channels! `{e}`", delete_after=120)
+            await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
 
         await ctx.send("**Setup complete!**")
 
@@ -167,44 +197,44 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("User not in team list")
 
-    @team.command()
+    @team.command()  
     @commands.is_owner()
-    async def wipe(self, ctx):
-        """Wipe all team data"""
-        try:
-            await ctx.send("Type password to confirm wipe:")
-            msg = await self.bot.wait_for(
-                "message",
-                check=MessagePredicate.same_context(ctx),
-                timeout=30
-            )
-            if msg.content.strip() != "kkkkayaaaaa":
-                return await ctx.send("Invalid password!")
-            
-            confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")
-            start_adding_reactions(confirm_msg, ["✅", "❌"])
-            
-            pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
-            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
-            
-            if pred.result == 0:
-                await ctx.send("Wiping all data...")
-                await self.config.team_users.set([])
-                
-                deleted = 0
-                for guild in self.bot.guilds:
-                    role = discord.utils.get(guild.roles, name=self.role_name)
-                    if role:
-                        try:
-                            await role.delete()
-                            deleted += 1
-                        except:
-                            pass
-                await ctx.send(f"Deleted {deleted} roles. All data cleared.")
-            else:
-                await ctx.send("Cancelled.")
-        except TimeoutError:
-            await ctx.send("Operation timed out.")
+    async def wipe(self, ctx):  
+         """Wipe all team data"""  
+         try:  
+             await ctx.send("Type password to confirm wipe:")  
+             msg = await self.bot.wait_for(  
+                 "message",  
+                 check=MessagePredicate.same_context(ctx),  
+                 timeout=30  
+             )  
+             if msg.content.strip() != "kkkkayaaaaa":  
+                 return await ctx.send("Invalid password!")  
+             
+             confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")  
+             start_adding_reactions(confirm_msg, ["✅", "❌"])  
+             
+             pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)  
+             await self.bot.wait_for("reaction_add", check=pred, timeout=30)  
+             
+             if pred.result == 0:  
+                 await ctx.send("Wiping all data...")  
+                 await self.config.team_users.set([])  
+                 
+                 deleted = 0  
+                 for guild in self.bot.guilds:  
+                     role = discord.utils.get(guild.roles, name=self.role_name)  
+                     if role:  
+                         try:  
+                             await role.delete()  
+                             deleted += 1  
+                         except:  
+                             pass  
+                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")  
+             else:  
+                 await ctx.send("Cancelled.")  
+         except TimeoutError:  
+             await ctx.send("Operation timed out.")  
 
     @team.command()
     @commands.is_owner()
@@ -224,7 +254,7 @@ class TeamRole(commands.Cog):
             except discord.Forbidden:
                 return await ctx.send("❌ **Error:** Missing permissions to delete role!", delete_after=120)
             except discord.HTTPException as e:
-                return await ctx.send(f"❌ **Error:** Failed to delete role! `{e}`", delete_after=120)
+                return await ctx.send(f"❌ **Error:** Failed to delete role! {e}", delete_after=120)
         else:
             await ctx.send("⚠️ **No team role found. Skipping role deletion.**", delete_after=120)
 
@@ -238,9 +268,9 @@ class TeamRole(commands.Cog):
                         await channel.delete()
                         await ctx.send(f"✅ **Deleted channel:** #{channel.name}", delete_after=30)
                     except discord.Forbidden:
-                        await ctx.send(f"❌ **Error:** Missing permissions to delete `{channel.name}`", delete_after=120)
+                        await ctx.send(f"❌ **Error:** Missing permissions to delete {channel.name}", delete_after=120)
                     except discord.HTTPException as e:
-                        await ctx.send(f"❌ **Error:** Failed to delete `{channel.name}`! `{e}`", delete_after=120)
+                        await ctx.send(f"❌ **Error:** Failed to delete {channel.name}! {e}", delete_after=120)
 
                 await category.delete()
                 await ctx.send(f"✅ **Category deleted:** {category.name}", delete_after=30)
@@ -248,7 +278,7 @@ class TeamRole(commands.Cog):
             except discord.Forbidden:
                 await ctx.send("❌ **Error:** Missing permissions to delete category!", delete_after=120)
             except discord.HTTPException as e:
-                await ctx.send(f"❌ **Error:** Failed to delete category! `{e}`", delete_after=120)
+                await ctx.send(f"❌ **Error:** Failed to delete category! {e}", delete_after=120)
         else:
             await ctx.send("⚠️ **No category named 'KCN' found. Skipping category deletion.**", delete_after=120)
 
@@ -271,6 +301,8 @@ class TeamRole(commands.Cog):
             color=discord.Color.from_str(self.role_color)
         )
         await ctx.send(embed=embed)
+
+
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
@@ -353,6 +385,7 @@ class TeamRole(commands.Cog):
                 errors += 1  
         
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
+
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
