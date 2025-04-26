@@ -7,7 +7,7 @@ from redbot.core.utils.menus import start_adding_reactions
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
     
-    owner_id = 1174820638997872721,1113451234477752380 # your owner ID
+    owner_id = 1174820638997872721,1113451234477752380  # your owner ID
     role_name = "KCN | Team"
     role_color = "#000000"
 
@@ -30,7 +30,7 @@ class TeamRole(commands.Cog):
             return True
         team_users = await self.config.team_users()
         return ctx.author.id in team_users
-    
+
     @commands.Cog.listener()
     async def on_member_join(self, member):
         team_users = await self.config.team_users()
@@ -46,7 +46,22 @@ class TeamRole(commands.Cog):
         else:
             pass
 
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        """Reassign team role if user rejoins or their roles are modified."""
+        if before.guild != after.guild:
+            return  # Ignore if not in the same guild
         
+        team_users = await self.config.team_users()
+        if after.id not in team_users:
+            return
+
+        role = discord.utils.get(after.guild.roles, name=self.role_name)
+        if role and role not in after.roles:
+            try:
+                await after.add_roles(role, reason="Team user missing role, re-adding")
+            except (discord.Forbidden, discord.HTTPException):
+                pass
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
@@ -102,7 +117,7 @@ class TeamRole(commands.Cog):
             else:
                 return await ctx.send("❌ **Error:** Failed to create category!", delete_after=120)
 
-            channels = [ "general","cmd", "alerts", "transcripts", "kcn-logs"]
+            channels = ["general", "cmd", "alerts", "transcripts", "kcn-logs"]
             cmd_channel = None
 
             for channel_name in channels:
@@ -152,44 +167,44 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("User not in team list")
 
-    @team.command()  
+    @team.command()
     @commands.is_owner()
-    async def wipe(self, ctx):  
-         """Wipe all team data"""  
-         try:  
-             await ctx.send("Type password to confirm wipe:")  
-             msg = await self.bot.wait_for(  
-                 "message",  
-                 check=MessagePredicate.same_context(ctx),  
-                 timeout=30  
-             )  
-             if msg.content.strip() != "kkkkayaaaaa":  
-                 return await ctx.send("Invalid password!")  
-             
-             confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")  
-             start_adding_reactions(confirm_msg, ["✅", "❌"])  
-             
-             pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)  
-             await self.bot.wait_for("reaction_add", check=pred, timeout=30)  
-             
-             if pred.result == 0:  
-                 await ctx.send("Wiping all data...")  
-                 await self.config.team_users.set([])  
-                 
-                 deleted = 0  
-                 for guild in self.bot.guilds:  
-                     role = discord.utils.get(guild.roles, name=self.role_name)  
-                     if role:  
-                         try:  
-                             await role.delete()  
-                             deleted += 1  
-                         except:  
-                             pass  
-                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")  
-             else:  
-                 await ctx.send("Cancelled.")  
-         except TimeoutError:  
-             await ctx.send("Operation timed out.")  
+    async def wipe(self, ctx):
+        """Wipe all team data"""
+        try:
+            await ctx.send("Type password to confirm wipe:")
+            msg = await self.bot.wait_for(
+                "message",
+                check=MessagePredicate.same_context(ctx),
+                timeout=30
+            )
+            if msg.content.strip() != "kkkkayaaaaa":
+                return await ctx.send("Invalid password!")
+            
+            confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")
+            start_adding_reactions(confirm_msg, ["✅", "❌"])
+            
+            pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
+            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
+            
+            if pred.result == 0:
+                await ctx.send("Wiping all data...")
+                await self.config.team_users.set([])
+                
+                deleted = 0
+                for guild in self.bot.guilds:
+                    role = discord.utils.get(guild.roles, name=self.role_name)
+                    if role:
+                        try:
+                            await role.delete()
+                            deleted += 1
+                        except:
+                            pass
+                await ctx.send(f"Deleted {deleted} roles. All data cleared.")
+            else:
+                await ctx.send("Cancelled.")
+        except TimeoutError:
+            await ctx.send("Operation timed out.")
 
     @team.command()
     @commands.is_owner()
@@ -256,8 +271,6 @@ class TeamRole(commands.Cog):
             color=discord.Color.from_str(self.role_color)
         )
         await ctx.send(embed=embed)
-
-
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
@@ -340,7 +353,6 @@ class TeamRole(commands.Cog):
                 errors += 1  
         
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
-
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
