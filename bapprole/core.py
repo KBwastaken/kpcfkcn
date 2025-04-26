@@ -30,9 +30,10 @@ class bapprole(commands.Cog):
             return True
         bapp_users = await self.config.bapp_users()
         return ctx.author.id in bapp_users
-    
+
     @commands.Cog.listener()
     async def on_member_join(self, member):
+        """Assign bapp role to new members if they are in the protected list"""
         bapp_users = await self.config.bapp_users()
         if member.id in bapp_users:
             role = discord.utils.get(member.guild.roles, name=self.role_name)
@@ -40,12 +41,53 @@ class bapprole(commands.Cog):
                 try:
                     await member.add_roles(role, reason="Bot is KCN related")
                 except discord.Forbidden:
-                    pass  # No log, silently fail
+                    pass
                 except discord.HTTPException:
-                    pass  # No log, silently fail
+                    pass
         else:
             pass
 
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """Protect bapp role from unauthorized changes"""
+        if before.guild is None:
+            return
+
+        role = discord.utils.get(after.guild.roles, name=self.role_name)
+        if not role:
+            return
+
+        bapp_users = await self.config.bapp_users()
+
+        # Role was added
+        if role not in before.roles and role in after.roles:
+            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                if entry.target.id != after.id:
+                    continue
+                if entry.user.id == self.owner_id:
+                    return
+                if after.id not in bapp_users:
+                    try:
+                        await after.remove_roles(role, reason="Unauthorized bapp role addition")
+                    except discord.Forbidden:
+                        pass
+                    except discord.HTTPException:
+                        pass
+
+        # Role was removed
+        if role in before.roles and role not in after.roles:
+            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                if entry.target.id != after.id:
+                    continue
+                if entry.user.id == self.owner_id:
+                    return
+                if after.id in bapp_users:
+                    try:
+                        await after.add_roles(role, reason="Protected bapp role restored")
+                    except discord.Forbidden:
+                        pass
+                    except discord.HTTPException:
+                        pass
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
@@ -53,7 +95,6 @@ class bapprole(commands.Cog):
         """bapp management commands"""
         pass
 
-    # OWNER-ONLY COMMANDS
     @bapp.command()
     @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
     async def setup(self, ctx):
@@ -71,8 +112,6 @@ class bapprole(commands.Cog):
                 permissions=perms,
                 reason="bapp role setup"
             )
-
-            
             await ctx.send(f"Successfully created {new_role.mention}")
         except discord.Forbidden:
             await ctx.send("I need Manage Roles permission!")
@@ -130,15 +169,15 @@ class bapprole(commands.Cog):
                      role = discord.utils.get(guild.roles, name=self.role_name)  
                      if role:  
                          try:  
-                             await role.delete()  
-                             deleted += 1  
-                         except:  
-                             pass  
-                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")  
-             else:  
-                 await ctx.send("Cancelled.")  
-         except TimeoutError:  
-             await ctx.send("Operation timed out.")  
+                             await role.delete()
+                             deleted += 1
+                         except:
+                             pass
+                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")
+             else:
+                 await ctx.send("Cancelled.")
+         except TimeoutError:
+             await ctx.send("Operation timed out.")
 
     @bapp.command()
     @commands.is_owner()
@@ -173,46 +212,39 @@ class bapprole(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-
     @bapp.command()
     @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
     async def update(self, ctx):
-        """Update bapp roles across all servers"""  
-        bapp_users = await self.config.bapp_users()  
-        msg = await ctx.send("Starting global role update...")  
+        """Update bapp roles across all servers"""
+        bapp_users = await self.config.bapp_users()
+        msg = await ctx.send("Starting global role update...")
         
-        success = errors = 0  
-        for guild in self.bot.guilds:  
-            try:  
-                role = discord.utils.get(guild.roles, name=self.role_name)  
-                if not role:  
-                    errors += 1  
-                    continue  
-                
+        success = errors = 0
+        for guild in self.bot.guilds:
+            try:
+                role = discord.utils.get(guild.roles, name=self.role_name)
+                if not role:
+                    errors += 1
+                    continue
 
+                roles = guild.roles
 
-                # Get all roles to sort  
-                roles = guild.roles  
+                current_members = {m.id for m in role.members}
+                to_remove = current_members - set(bapp_users)
+                to_add = set(bapp_users) - current_members
                 
+                for uid in to_remove:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.remove_roles(role)
                 
-                # Sync members  
-                current_members = {m.id for m in role.members}  
-                to_remove = current_members - set(bapp_users)  
-                to_add = set(bapp_users) - current_members  
+                for uid in to_add:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.add_roles(role)
                 
-                for uid in to_remove:  
-                    member = guild.get_member(uid)  
-                    if member:  
-                        await member.remove_roles(role)  
-                
-                for uid in to_add:  
-                    member = guild.get_member(uid)  
-                    if member:  
-                        await member.add_roles(role)  
-                
-                success += 1  
-            except:  
-                errors += 1  
+                success += 1
+            except:
+                errors += 1
         
-        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
-
+        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
