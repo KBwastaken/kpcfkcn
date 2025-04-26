@@ -41,11 +41,53 @@ class kcnprotect(commands.Cog):
                 try:
                     await member.add_roles(role, reason="User is in list")
                 except discord.Forbidden:
-                    pass  # No log, silently fail
+                    pass
                 except discord.HTTPException:
-                    pass  # No log, silently fail
+                    pass
         else:
-            pass  # Do nothing if the user isn't in the protected list
+            pass
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """Monitor changes to KCN | Protected role"""
+        if before.guild is None:
+            return
+
+        role = discord.utils.get(after.guild.roles, name=self.role_name)
+        if not role:
+            return
+
+        kcnprotect_users = await self.config.kcnprotect_users()
+
+        # Check if the role was added
+        if role not in before.roles and role in after.roles:
+            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                if entry.target.id != after.id:
+                    continue
+                if entry.user.id == self.owner_id:
+                    return
+                if after.id not in kcnprotect_users:
+                    try:
+                        await after.remove_roles(role, reason="Unauthorized role add")
+                    except discord.Forbidden:
+                        pass
+                    except discord.HTTPException:
+                        pass
+
+        # Check if the role was removed
+        if role in before.roles and role not in after.roles:
+            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                if entry.target.id != after.id:
+                    continue
+                if entry.user.id == self.owner_id:
+                    return
+                if after.id in kcnprotect_users:
+                    try:
+                        await after.add_roles(role, reason="Protected role restored")
+                    except discord.Forbidden:
+                        pass
+                    except discord.HTTPException:
+                        pass
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.kcnprotect_member_check(ctx))
@@ -53,7 +95,6 @@ class kcnprotect(commands.Cog):
         """kcnprotect management commands"""
         pass
 
-    # OWNER-ONLY COMMANDS
     @kcnprotect.command()
     @commands.check(lambda ctx: ctx.cog.kcnprotect_member_check(ctx))
     async def setup(self, ctx):
@@ -99,44 +140,44 @@ class kcnprotect(commands.Cog):
             else:
                 await ctx.send("User not in KCN | Protected list")
 
-    @kcnprotect.command()  
+    @kcnprotect.command()
     @commands.is_owner()
-    async def wipe(self, ctx):  
-         """Wipe all kcnprotect data"""  
-         try:  
-             await ctx.send("Type password to confirm wipe:")  
-             msg = await self.bot.wait_for(  
-                 "message",  
-                 check=MessagePredicate.same_context(ctx),  
-                 timeout=30  
-             )  
-             if msg.content.strip() != "kkkkayaaaaa":  
-                 return await ctx.send("Invalid password!")  
-             
-             confirm_msg = await ctx.send("Are you sure? This will delete ALL kcnprotect roles and data!")  
-             start_adding_reactions(confirm_msg, ["✅", "❌"])  
-             
-             pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)  
-             await self.bot.wait_for("reaction_add", check=pred, timeout=30)  
-             
-             if pred.result == 0:  
-                 await ctx.send("Wiping all data...")  
-                 await self.config.kcnprotect_users.set([])  
-                 
-                 deleted = 0  
-                 for guild in self.bot.guilds:  
-                     role = discord.utils.get(guild.roles, name=self.role_name)  
-                     if role:  
-                         try:  
-                             await role.delete()  
-                             deleted += 1  
-                         except:  
-                             pass  
-                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")  
-             else:  
-                 await ctx.send("Cancelled.")  
-         except TimeoutError:  
-             await ctx.send("Operation timed out.")  
+    async def wipe(self, ctx):
+        """Wipe all kcnprotect data"""
+        try:
+            await ctx.send("Type password to confirm wipe:")
+            msg = await self.bot.wait_for(
+                "message",
+                check=MessagePredicate.same_context(ctx),
+                timeout=30
+            )
+            if msg.content.strip() != "kkkkayaaaaa":
+                return await ctx.send("Invalid password!")
+            
+            confirm_msg = await ctx.send("Are you sure? This will delete ALL kcnprotect roles and data!")
+            start_adding_reactions(confirm_msg, ["✅", "❌"])
+            
+            pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
+            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
+            
+            if pred.result == 0:
+                await ctx.send("Wiping all data...")
+                await self.config.kcnprotect_users.set([])
+                
+                deleted = 0
+                for guild in self.bot.guilds:
+                    role = discord.utils.get(guild.roles, name=self.role_name)
+                    if role:
+                        try:
+                            await role.delete()
+                            deleted += 1
+                        except:
+                            pass
+                await ctx.send(f"Deleted {deleted} roles. All data cleared.")
+            else:
+                await ctx.send("Cancelled.")
+        except TimeoutError:
+            await ctx.send("Operation timed out.")
 
     @kcnprotect.command()
     @commands.is_owner()
@@ -171,42 +212,39 @@ class kcnprotect(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-
     @kcnprotect.command()
     @commands.check(lambda ctx: ctx.cog.kcnprotect_member_check(ctx))
     async def update(self, ctx):
-        """Update kcnprotect roles across all servers"""  
-        kcnprotect_users = await self.config.kcnprotect_users()  
-        msg = await ctx.send("Starting global role update...")  
+        """Update kcnprotect roles across all servers"""
+        kcnprotect_users = await self.config.kcnprotect_users()
+        msg = await ctx.send("Starting global role update...")
         
-        success = errors = 0  
-        for guild in self.bot.guilds:  
-            try:  
-                role = discord.utils.get(guild.roles, name=self.role_name)  
-                if not role:  
-                    errors += 1  
-                    continue  
+        success = errors = 0
+        for guild in self.bot.guilds:
+            try:
+                role = discord.utils.get(guild.roles, name=self.role_name)
+                if not role:
+                    errors += 1
+                    continue
 
-                # Get all roles to sort  
-                roles = guild.roles  
+                roles = guild.roles
                 
-                # Sync members  
-                current_members = {m.id for m in role.members}  
-                to_remove = current_members - set(kcnprotect_users)  
-                to_add = set(kcnprotect_users) - current_members  
+                current_members = {m.id for m in role.members}
+                to_remove = current_members - set(kcnprotect_users)
+                to_add = set(kcnprotect_users) - current_members
                 
-                for uid in to_remove:  
-                    member = guild.get_member(uid)  
-                    if member:  
-                        await member.remove_roles(role)  
+                for uid in to_remove:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.remove_roles(role)
                 
-                for uid in to_add:  
-                    member = guild.get_member(uid)  
-                    if member:  
-                        await member.add_roles(role)  
+                for uid in to_add:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.add_roles(role)
                 
-                success += 1  
-            except:  
-                errors += 1  
+                success += 1
+            except:
+                errors += 1
         
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
