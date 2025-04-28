@@ -87,30 +87,35 @@ class ServerBan(red_commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-        # DM the user
-        try:
-            user = await self.bot.fetch_user(user_id)
-            invite_link = None
-            if interaction.guild:
-                invites = await interaction.guild.invites()
-                if invites:
-                    invite_link = invites[0].url
-                else:
-                    invite = await interaction.channel.create_invite(max_uses=1, unique=True)
-                    invite_link = invite.url
+# Inside the sunban command - when sending DM
 
-            dm_embed = discord.Embed(
-                title="You have been unbanned",
-                description=(f"Reason: Your application has been accepted. You may rejoin using the invite link.\n"
-                             f"You have been unbanned from {interaction.guild.name}"),
-                color=discord.Color.green()
-            )
-            if invite_link:
-                await user.send(embed=dm_embed, view=RejoinButton(invite_link))
-            else:
-                await user.send(embed=dm_embed)
-        except discord.HTTPException:
-            await interaction.followup.send(embed=self._error_embed("Failed to DM the user."), ephemeral=True)
+try:
+    user = await self.bot.fetch_user(user_id)
+    invite_link = None
+    if interaction.guild:
+        invites = await interaction.guild.invites()
+        if invites:
+            invite_link = invites[0].url
+        else:
+            invite = await interaction.channel.create_invite(max_uses=1, unique=True)
+            invite_link = invite.url
+
+    # Modified DM message section for the "Server" field
+    dm_embed = discord.Embed(
+        title="You have been unbanned",
+        description=(f"Reason: Your application has been accepted. You may rejoin using the invite link.\n"
+                     f"You have been unbanned from {interaction.guild.name}" if not is_global else "You have been unbanned from KCN Globalban"),
+        color=discord.Color.green()
+    )
+    
+    if invite_link:
+        await user.send(embed=dm_embed, view=RejoinButton(invite_link))
+    else:
+        await user.send(embed=dm_embed)
+
+except discord.HTTPException:
+    await interaction.followup.send(embed=self._error_embed("Failed to DM the user."), ephemeral=True)
+
 
         await self._force_unban(user_id, interaction, reason, is_global)
 
@@ -158,22 +163,25 @@ class ServerBan(red_commands.Cog):
 
         await interaction.followup.send(embed=embed)
 
-        # DM the user
-        try:
-            user = await self.bot.fetch_user(user_id)
-            ban_embed = discord.Embed(
-                title="You have been banned",
-                description=(f"Reason: Action requested by {moderator} ({moderator.id})\n\n"
-                             f"Servers: {interaction.guild.name}\n\n"
-                             "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
-                             "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
-                color=discord.Color.red()
-            )
-            ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
-            ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
-            await user.send(embed=ban_embed)
-        except discord.HTTPException:
-            await interaction.followup.send(embed=self._error_embed("Failed to DM the user."), ephemeral=True)
+try:
+    user = await self.bot.fetch_user(user_id)
+    
+    ban_embed = discord.Embed(
+        title="You have been banned",
+        description=(f"Reason: Action requested by {moderator.display_name} ({moderator.id})\n"
+                     f"Servers: {'KCN Globalban' if is_global else interaction.guild.name}\n\n"
+                     "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
+                     "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
+        color=discord.Color.red()
+    )
+    ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
+    ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
+    
+    await user.send(embed=ban_embed)
+
+except discord.HTTPException:
+    await interaction.followup.send(embed=self._error_embed("Failed to DM the user."), ephemeral=True)
+
 
         await self._force_ban(user_id, interaction, reason, is_global)
 
