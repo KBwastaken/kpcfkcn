@@ -13,13 +13,25 @@ class RoleManager(commands.Cog):
 
     async def sync_slash_commands(self):
         """Sync all slash commands globally."""
-        self.tree.clear_commands(guild=None)  # Clear old commands globally
+        # Remove the existing commands before adding new ones to avoid duplication
+        try:
+            self.tree.remove_command("assignrole")
+            self.tree.remove_command("unassignrole")
+            self.tree.remove_command("assignmultirole")
+            self.tree.remove_command("unassignmultirole")
+            self.tree.remove_command("massrole")
+            self.tree.remove_command("roleif")
+        except Exception as e:
+            print(f"Error removing commands: {e}")
+        
+        # Now register the commands again
         self.tree.add_command(self.assignrole)
         self.tree.add_command(self.unassignrole)
         self.tree.add_command(self.assignmultirole)
         self.tree.add_command(self.unassignmultirole)
         self.tree.add_command(self.massrole)
         self.tree.add_command(self.roleif)
+
         await self.tree.sync()  # Sync globally
 
     async def cog_load(self):
@@ -28,7 +40,15 @@ class RoleManager(commands.Cog):
 
     async def cog_unload(self):
         """Ensure commands are removed when the cog is unloaded."""
-        self.tree.clear_commands(guild=None)  # Clear commands globally on unload
+        try:
+            self.tree.remove_command("assignrole")
+            self.tree.remove_command("unassignrole")
+            self.tree.remove_command("assignmultirole")
+            self.tree.remove_command("unassignmultirole")
+            self.tree.remove_command("massrole")
+            self.tree.remove_command("roleif")
+        except Exception as e:
+            print(f"Error removing commands on unload: {e}")
 
     def has_higher_role(self, interaction: discord.Interaction, role: discord.Role):
         """Check if the bot or user can assign a role above their highest role."""
