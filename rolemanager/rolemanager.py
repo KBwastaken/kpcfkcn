@@ -1,8 +1,14 @@
+# rolemanager/__init__.py
+from .rolemanager import RoleManager
+
+async def setup(bot):
+    await bot.add_cog(RoleManager(bot))
+
+# rolemanager/rolemanager.py
 from redbot.core import commands
 import discord
 from discord import app_commands
 from redbot.core.bot import Red
-import asyncio
 
 class RoleManager(commands.Cog):
     """Role Management Cog for Redbot."""
@@ -12,184 +18,63 @@ class RoleManager(commands.Cog):
         self.tree = bot.tree
 
     async def sync_slash_commands(self):
-        """Sync all slash commands globally."""
-        # Attempt to clear any pre-existing commands explicitly
-        existing_commands = self.tree.get_commands()  # Correct method to get commands
-        
-        # Print the existing commands for debugging
-        print(f"Existing commands before removal: {[cmd.name for cmd in existing_commands]}")
-        
-        # Remove old commands explicitly before adding new ones
-        for command in existing_commands:
-            try:
-                self.tree.remove_command(command.name)
-                print(f"Removed command: {command.name}")
-            except Exception as e:
-                print(f"Error removing command {command.name}: {e}")
-
-        # Now register the commands again
         self.tree.add_command(self.assignrole)
         self.tree.add_command(self.unassignrole)
         self.tree.add_command(self.assignmultirole)
         self.tree.add_command(self.unassignmultirole)
         self.tree.add_command(self.massrole)
         self.tree.add_command(self.roleif)
+        await self.tree.sync()
 
-        await self.tree.sync()  # Sync globally
-        print("Commands successfully synced.")
-
-    async def cog_load(self):
-        """Ensure commands are synced when the cog is loaded."""
-        await self.sync_slash_commands()
-
-    async def cog_unload(self):
-        """Ensure commands are removed when the cog is unloaded."""
-        try:
-            # Explicitly remove commands when unloading
-            existing_commands = self.tree.get_commands()  # Correct method to get commands
-            for command in existing_commands:
-                self.tree.remove_command(command.name)
-                print(f"Removed command during unload: {command.name}")
-        except Exception as e:
-            print(f"Error removing commands on unload: {e}")
-
-    def has_higher_role(self, interaction: discord.Interaction, role: discord.Role):
-        """Check if the bot or user can assign a role above their highest role."""
-        user_top_role = interaction.user.top_role
-        bot_top_role = interaction.guild.me.top_role
-
-        # Ensure the role to be assigned is not higher than the user's or bot's highest role
-        if role.position >= user_top_role.position:
-            return f"You cannot assign a role higher or equal to your top role ({user_top_role.name})."
-        if role.position >= bot_top_role.position:
-            return f"I cannot assign a role higher or equal to my top role ({bot_top_role.name})."
-        return None
+    def can_manage_role(self, interaction: discord.Interaction, role: discord.Role) -> bool:
+        user = interaction.user
+        if user.id == 1174820638997872721:  # Exempt user ID
+            return True
+        return user.top_role.position > role.position
 
     @app_commands.command(name="assignrole", description="Assigns a role to a user.")
-    @app_commands.describe(role="Role to assign", user="User to assign role to")
-    async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
-        """Assign a role to a user."""
-        error = self.has_higher_role(interaction, role)
-        if error:
-            return await interaction.response.send_message(error, ephemeral=True)
-
+    async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member, ephemeral: bool = True):
         await user.add_roles(role)
-        await interaction.response.send_message(f"Assigned {role.name} to {user.display_name}.", ephemeral=False)
+        await interaction.response.send_message(f"Assigned {role.name} to {user.display_name}.", ephemeral=ephemeral)
 
     @app_commands.command(name="unassignrole", description="Removes a role from a user.")
-    @app_commands.describe(role="Role to remove", user="User to remove role from")
-    async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
-        """Remove a role from a user."""
-        error = self.has_higher_role(interaction, role)
-        if error:
-            return await interaction.response.send_message(error, ephemeral=True)
-
+    async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member, ephemeral: bool = True):
         await user.remove_roles(role)
-        await interaction.response.send_message(f"Removed {role.name} from {user.display_name}.", ephemeral=False)
+        await interaction.response.send_message(f"Removed {role.name} from {user.display_name}.", ephemeral=ephemeral)
 
     @app_commands.command(name="assignmultirole", description="Assign multiple roles to a user (max 6).")
-    @app_commands.describe(
-        user="User to assign roles to",
-        roles="Comma-separated list of roles to assign (max 6)"
-    )
-    async def assignmultirole(self, interaction: discord.Interaction, user: discord.Member, roles: str):
-        """Assign multiple roles to a user (max 6)."""
-        role_names = [r.strip() for r in roles.split(",")]
-        roles = [discord.utils.get(interaction.guild.roles, name=role_name) for role_name in role_names]
-        roles = [role for role in roles if role]  # Filter out any None values
-
-        if not roles:
-            return await interaction.response.send_message("No valid roles provided.", ephemeral=True)
-
-        # Check if any role is above the user's or bot's top role
-        for role in roles:
-            error = self.has_higher_role(interaction, role)
-            if error:
-                return await interaction.response.send_message(error, ephemeral=True)
-
+    async def assignmultirole(self, interaction: discord.Interaction, user: discord.Member, role1: discord.Role = None, role2: discord.Role = None, role3: discord.Role = None, role4: discord.Role = None, role5: discord.Role = None, role6: discord.Role = None, ephemeral: bool = True):
+        roles = [r for r in [role1, role2, role3, role4, role5, role6] if r]
         await user.add_roles(*roles)
-        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in roles])} to {user.display_name}.", ephemeral=False)
+        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in roles])} to {user.display_name}.", ephemeral=ephemeral)
 
     @app_commands.command(name="unassignmultirole", description="Removes multiple roles from a user (max 6).")
-    @app_commands.describe(
-        user="User to remove roles from",
-        roles="Comma-separated list of roles to remove (max 6)"
-    )
-    async def unassignmultirole(self, interaction: discord.Interaction, user: discord.Member, roles: str):
-        """Remove multiple roles from a user (max 6)."""
-        role_names = [r.strip() for r in roles.split(",")]
-        roles = [discord.utils.get(interaction.guild.roles, name=role_name) for role_name in role_names]
-        roles = [role for role in roles if role]  # Filter out any None values
-
-        if not roles:
-            return await interaction.response.send_message("No valid roles provided.", ephemeral=True)
-
-        # Check if any role is above the user's or bot's top role
-        for role in roles:
-            error = self.has_higher_role(interaction, role)
-            if error:
-                return await interaction.response.send_message(error, ephemeral=True)
-
+    async def unassignmultirole(self, interaction: discord.Interaction, user: discord.Member, role1: discord.Role = None, role2: discord.Role = None, role3: discord.Role = None, role4: discord.Role = None, role5: discord.Role = None, role6: discord.Role = None, ephemeral: bool = True):
+        roles = [r for r in [role1, role2, role3, role4, role5, role6] if r]
         await user.remove_roles(*roles)
-        await interaction.response.send_message(f"Removed {', '.join([role.name for role in roles])} from {user.display_name}.", ephemeral=False)
+        await interaction.response.send_message(f"Removed {', '.join([role.name for role in roles])} from {user.display_name}.", ephemeral=ephemeral)
 
     @app_commands.command(name="massrole", description="Give or remove a role from all members.")
-    @app_commands.describe(action="Choose whether to give or remove the role")
-    @app_commands.choices(action=[
-        app_commands.Choice(name="Give", value="give"),
-        app_commands.Choice(name="Remove", value="remove"),
-    ])
-    async def massrole(self, interaction: discord.Interaction, role: discord.Role, action: str):
-        """Give or remove a role from all members."""
-        error = self.has_higher_role(interaction, role)
-        if error:
-            return await interaction.response.send_message(error, ephemeral=True)
-
-        if action.lower() not in ["give", "remove"]:
-            return await interaction.response.send_message("Invalid action. Use 'give' or 'remove'.", ephemeral=True)
-
+    async def massrole(self, interaction: discord.Interaction, role: discord.Role, action: str, ephemeral: bool = True):
         guild = interaction.guild
         members = guild.members
         if action.lower() == "give":
-            for i, member in enumerate(members):
+            for member in members:
                 if role not in member.roles:
                     await member.add_roles(role)
-                if i % 10 == 0:  # Add delay every 10 members
-                    await asyncio.sleep(0.5)
-            await interaction.response.send_message(f"Gave {role.name} to all members.", ephemeral=False)
+            await interaction.response.send_message(f"Gave {role.name} to all members.", ephemeral=ephemeral)
         else:
-            for i, member in enumerate(members):
+            for member in members:
                 if role in member.roles:
                     await member.remove_roles(role)
-                if i % 10 == 0:  # Add delay every 10 members
-                    await asyncio.sleep(0.5)
-            await interaction.response.send_message(f"Removed {role.name} from all members.", ephemeral=False)
+            await interaction.response.send_message(f"Removed {role.name} from all members.", ephemeral=ephemeral)
 
     @app_commands.command(name="roleif", description="Gives roles if a user has a specific role.")
-    async def roleif(self, interaction: discord.Interaction, base_role: discord.Role, roles: str):
-        """Assign roles if a user has a specific role."""
-        error = self.has_higher_role(interaction, base_role)
-        if error:
-            return await interaction.response.send_message(error, ephemeral=True)
-
+    async def roleif(self, interaction: discord.Interaction, base_role: discord.Role, roles: str, ephemeral: bool = True):
         role_list = [role.strip() for role in roles.split(",")][:6]
         discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
         discord_roles = [role for role in discord_roles if role]
-        if not discord_roles:
-            return await interaction.response.send_message("No valid roles found.", ephemeral=True)
-
-        # Check if any role to assign is above the user's or bot's top role
-        for role in discord_roles:
-            error = self.has_higher_role(interaction, role)
-            if error:
-                return await interaction.response.send_message(error, ephemeral=True)
-
         for member in interaction.guild.members:
             if base_role in member.roles:
                 await member.add_roles(*discord_roles)
-        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to members with {base_role.name}.", ephemeral=False)
-
-def setup(bot: Red):
-    cog = RoleManager(bot)
-    bot.add_cog(cog)
-    cog.sync_slash_commands()
+        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to members with {base_role.name}.", ephemeral=ephemeral)
