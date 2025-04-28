@@ -73,7 +73,7 @@ class ServerBan(red_commands.Cog):
         is_global = is_global.value.lower() == "yes"
 
         if not reason:
-            reason = f"Action requested by {moderator.name} ({moderator.id})"
+            reason = f"Action requested by {interaction.user.name} ({interacton.user.id})"
 
         await interaction.response.defer()
 
@@ -149,7 +149,7 @@ class ServerBan(red_commands.Cog):
         is_global = is_global.value.lower() == "yes"
         moderator = interaction.user
         if not reason:
-            reason = f"Action requested by {moderator.name} ({moderator.id})"
+            reason = f"Action requested by {interaction.user.name} ({interacton.user.id})"
 
 
         await interaction.response.defer()
