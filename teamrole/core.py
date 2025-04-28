@@ -7,7 +7,7 @@ from redbot.core.utils.menus import start_adding_reactions
 class TeamRole(commands.Cog):
     """Manage team role across all servers"""
     
-    owner_id = 1174820638997872721,1113451234477752380 # your owner ID
+    owner_id = 1174820638997872721 # your owner ID
     role_name = "KCN | Team"
     role_color = "#000000"
 
