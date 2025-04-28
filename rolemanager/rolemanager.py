@@ -11,21 +11,23 @@ class RoleManager(commands.Cog):
         self.tree = bot.tree
 
     async def sync_slash_commands(self):
-        # Ensure commands are only added if they're not already present
-        command_names = [command.name for command in await self.tree.get_commands()]
+        # Retrieve current commands to check if they're already registered
+        current_commands = await self.tree.get_commands()
 
-        if 'assignrole' not in command_names:
-            self.tree.add_command(self.assignrole)
-        if 'unassignrole' not in command_names:
-            self.tree.add_command(self.unassignrole)
-        if 'assignmultirole' not in command_names:
-            self.tree.add_command(self.assignmultirole)
-        if 'unassignmultirole' not in command_names:
-            self.tree.add_command(self.unassignmultirole)
-        if 'massrole' not in command_names:
-            self.tree.add_command(self.massrole)
-        if 'roleif' not in command_names:
-            self.tree.add_command(self.roleif)
+        # List of new commands
+        new_commands = [
+            self.assignrole,
+            self.unassignrole,
+            self.assignmultirole,
+            self.unassignmultirole,
+            self.massrole,
+            self.roleif
+        ]
+        
+        # Register new commands if they're not already in the list of current commands
+        for command in new_commands:
+            if command.name not in [cmd.name for cmd in current_commands]:
+                self.tree.add_command(command)
 
         # Sync commands with Discord
         await self.tree.sync()
@@ -97,4 +99,4 @@ class RoleManager(commands.Cog):
         for member in interaction.guild.members:
             if base_role in member.roles:
                 await member.add_roles(*discord_roles)
-        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to members with {base_role.name}.", ephemeral=ephemeral)
+        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to members with {base_role.name}._
