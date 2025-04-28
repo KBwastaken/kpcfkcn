@@ -11,7 +11,7 @@ class RoleManager(commands.Cog):
     def can_manage_role(self, ctx: commands.Context, role: discord.Role) -> bool:
         """Check if the user has the ability to manage the specified role."""
         user = ctx.author
-        if user.id in == 1174820638997872721, 1288170951267057839:  # Exempt user ID
+        if user.id in (1174820638997872721, 1288170951267057839):  # Exempt user ID
             return True
         # Ensure the user has 'Manage Roles' permission
         if not user.guild_permissions.manage_roles:
