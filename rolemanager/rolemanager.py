@@ -13,17 +13,20 @@ class RoleManager(commands.Cog):
 
     async def sync_slash_commands(self):
         """Sync all slash commands globally."""
-        # Remove the existing commands before adding new ones to avoid duplication
-        try:
-            self.tree.remove_command("assignrole")
-            self.tree.remove_command("unassignrole")
-            self.tree.remove_command("assignmultirole")
-            self.tree.remove_command("unassignmultirole")
-            self.tree.remove_command("massrole")
-            self.tree.remove_command("roleif")
-        except Exception as e:
-            print(f"Error removing commands: {e}")
+        # Attempt to clear any pre-existing commands explicitly
+        existing_commands = list(self.tree._get_commands())
         
+        # Print the existing commands for debugging
+        print(f"Existing commands before removal: {[cmd.name for cmd in existing_commands]}")
+        
+        # Remove old commands explicitly before adding new ones
+        for command in existing_commands:
+            try:
+                self.tree.remove_command(command.name)
+                print(f"Removed command: {command.name}")
+            except Exception as e:
+                print(f"Error removing command {command.name}: {e}")
+
         # Now register the commands again
         self.tree.add_command(self.assignrole)
         self.tree.add_command(self.unassignrole)
@@ -33,6 +36,7 @@ class RoleManager(commands.Cog):
         self.tree.add_command(self.roleif)
 
         await self.tree.sync()  # Sync globally
+        print("Commands successfully synced.")
 
     async def cog_load(self):
         """Ensure commands are synced when the cog is loaded."""
@@ -41,12 +45,11 @@ class RoleManager(commands.Cog):
     async def cog_unload(self):
         """Ensure commands are removed when the cog is unloaded."""
         try:
-            self.tree.remove_command("assignrole")
-            self.tree.remove_command("unassignrole")
-            self.tree.remove_command("assignmultirole")
-            self.tree.remove_command("unassignmultirole")
-            self.tree.remove_command("massrole")
-            self.tree.remove_command("roleif")
+            # Explicitly remove commands when unloading
+            existing_commands = list(self.tree._get_commands())
+            for command in existing_commands:
+                self.tree.remove_command(command.name)
+                print(f"Removed command during unload: {command.name}")
         except Exception as e:
             print(f"Error removing commands on unload: {e}")
 
@@ -185,3 +188,8 @@ class RoleManager(commands.Cog):
             if base_role in member.roles:
                 await member.add_roles(*discord_roles)
         await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to members with {base_role.name}.", ephemeral=False)
+
+def setup(bot: Red):
+    cog = RoleManager(bot)
+    bot.add_cog(cog)
+    cog.sync_slash_commands()
