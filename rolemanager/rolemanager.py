@@ -14,7 +14,7 @@ class RoleManager(commands.Cog):
     async def sync_slash_commands(self):
         """Sync all slash commands globally."""
         # Attempt to clear any pre-existing commands explicitly
-        existing_commands = list(self.tree._get_commands())
+        existing_commands = self.tree.get_commands()  # Correct method to get commands
         
         # Print the existing commands for debugging
         print(f"Existing commands before removal: {[cmd.name for cmd in existing_commands]}")
@@ -46,7 +46,7 @@ class RoleManager(commands.Cog):
         """Ensure commands are removed when the cog is unloaded."""
         try:
             # Explicitly remove commands when unloading
-            existing_commands = list(self.tree._get_commands())
+            existing_commands = self.tree.get_commands()  # Correct method to get commands
             for command in existing_commands:
                 self.tree.remove_command(command.name)
                 print(f"Removed command during unload: {command.name}")
