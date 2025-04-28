@@ -10,6 +10,11 @@ APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 BAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361786454862201075/c00kie-get-banned.gif"
 UNBAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361789020593455456/unban-fivem.gif"
 
+class RejoinButton(discord.ui.View):
+    def __init__(self, invite_link: str):
+        super().__init__()
+        self.add_item(discord.ui.Button(label="Rejoin Server", url=invite_link))
+
 class ServerBan(red_commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
@@ -85,14 +90,25 @@ class ServerBan(red_commands.Cog):
         # DM the user
         try:
             user = await self.bot.fetch_user(user_id)
+            invite_link = None
+            if interaction.guild:
+                invites = await interaction.guild.invites()
+                if invites:
+                    invite_link = invites[0].url
+                else:
+                    invite = await interaction.channel.create_invite(max_uses=1, unique=True)
+                    invite_link = invite.url
+
             dm_embed = discord.Embed(
                 title="You have been unbanned",
-                description=(f"**Reason:** Your application has been accepted. You may rejoin using the invite link.\n\n"
-                             f"You have been unbanned from {interaction.guild.name}\n\n"
-                             "Click the buttons below to rejoin:"),
+                description=(f"Reason: Your application has been accepted. You may rejoin using the invite link.\n"
+                             f"You have been unbanned from {interaction.guild.name}"),
                 color=discord.Color.green()
             )
-            await user.send(embed=dm_embed)
+            if invite_link:
+                await user.send(embed=dm_embed, view=RejoinButton(invite_link))
+            else:
+                await user.send(embed=dm_embed)
         except discord.HTTPException:
             await interaction.followup.send(embed=self._error_embed("Failed to DM the user."), ephemeral=True)
 
@@ -112,7 +128,7 @@ class ServerBan(red_commands.Cog):
 
         result = discord.Embed(title="Unban Results", description="\n".join(lines), color=discord.Color.orange())
         result.set_footer(text=f"Requested by {interaction.user.display_name}")
-        await interaction.followup.send(embed=result)
+        await interaction.followup.send(embed=result, ephemeral=True)
 
     @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
@@ -147,8 +163,8 @@ class ServerBan(red_commands.Cog):
             user = await self.bot.fetch_user(user_id)
             ban_embed = discord.Embed(
                 title="You have been banned",
-                description=(f"**Reason:** Action requested by {moderator} ({moderator.id})\n\n"
-                             f"**Servers:** {interaction.guild.name}\n\n"
+                description=(f"Reason: Action requested by {moderator} ({moderator.id})\n\n"
+                             f"Servers: {interaction.guild.name}\n\n"
                              "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                              "Try rejoining after 24 hours. If still banned, you can reapply in 30 days."),
                 color=discord.Color.red()
@@ -181,4 +197,4 @@ class ServerBan(red_commands.Cog):
 
         summary = discord.Embed(title="Ban Results", description="\n".join(lines), color=discord.Color.orange())
         summary.set_footer(text=f"Requested by {interaction.user.display_name}")
-        await interaction.followup.send(embed=summary)
+        await interaction.followup.send(embed=summary, ephemeral=True)
