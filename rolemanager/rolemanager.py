@@ -13,7 +13,7 @@ class RoleManager(commands.Cog):
 
     async def sync_slash_commands(self):
         """Sync all slash commands globally."""
-        self.tree.clear_commands()  # Clear old commands
+        self.tree.clear_commands(guild=None)  # Clear old commands globally
         self.tree.add_command(self.assignrole)
         self.tree.add_command(self.unassignrole)
         self.tree.add_command(self.assignmultirole)
