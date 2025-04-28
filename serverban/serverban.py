@@ -71,7 +71,9 @@ class ServerBan(red_commands.Cog):
             return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
 
         is_global = is_global.value.lower() == "yes"
-        reason = reason if reason else "None provided"
+
+        if not reason:
+            reason = f"Action requested by {moderator.name} ({moderator.id})"
 
         await interaction.response.defer()
 
@@ -146,7 +148,9 @@ class ServerBan(red_commands.Cog):
 
         is_global = is_global.value.lower() == "yes"
         moderator = interaction.user
-        reason = reason if reason else "None provided"
+        if not reason:
+            reason = f"Action requested by {moderator.name} ({moderator.id})"
+
 
         await interaction.response.defer()
 
