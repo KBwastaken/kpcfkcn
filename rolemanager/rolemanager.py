@@ -11,15 +11,20 @@ class RoleManager(commands.Cog):
         self.bot = bot
         self.tree = bot.tree
 
-    async def sync_slash_commands(self, guild: discord.Guild):
-        self.tree.clear_commands(guild=guild)  # Clear old commands for this guild
+    async def sync_slash_commands(self):
+        """Sync all slash commands globally."""
+        self.tree.clear_commands()  # Clear old commands
         self.tree.add_command(self.assignrole)
         self.tree.add_command(self.unassignrole)
         self.tree.add_command(self.assignmultirole)
         self.tree.add_command(self.unassignmultirole)
         self.tree.add_command(self.massrole)
         self.tree.add_command(self.roleif)
-        await self.tree.sync(guild=guild)
+        await self.tree.sync()  # Sync globally
+
+    async def cog_load(self):
+        """Ensure commands are synced when the cog is loaded."""
+        await self.sync_slash_commands()
 
     def has_higher_role(self, interaction: discord.Interaction, role: discord.Role):
         """Check if the bot or user can assign a role above their highest role."""
