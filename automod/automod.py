@@ -25,6 +25,7 @@ class AutoMod(commands.Cog):
             "mod_roles": [],
             "muted_role": None,
             "automod_enabled": False,
+            "immune_roles": [],  # Store immune roles
         }
 
         default_member = {
@@ -61,9 +62,16 @@ class AutoMod(commands.Cog):
         if not await self.config.guild(message.guild).automod_enabled():
             return
 
-        immune_role = discord.utils.get(message.guild.roles, name="KCN | Protected")
-        if immune_role and immune_role in message.author.roles:
-            return
+        # Get the list of immune roles (including the ones added via guildrole)
+        immune_roles = await self.config.guild(message.guild).get_raw("immune_roles", default=[])
+
+        # Add the "KCN | Protected" role as a default immune role
+        immune_roles.append(discord.utils.get(message.guild.roles, name="KCN | Protected").id)
+
+        # Check if the user has any immune roles
+        user_roles = [role.id for role in message.author.roles]
+        if any(role_id in immune_roles for role_id in user_roles):
+            return  # Skip automod actions for users with immune roles
 
         # Word matching - avoids substrings like "night" for "nig"
         words = re.findall(r"\b\w+\b", message.content.lower())
@@ -265,6 +273,42 @@ class AutoMod(commands.Cog):
                 except discord.Forbidden:
                     continue
         await ctx.send(f"{user.mention} has been unmuted in all shared servers.")
+
+    @commands.is_owner()
+    @commands.guild_only()
+    @commands.command()
+    async def guildrole(self, ctx: commands.Context, role_id: int, action: bool):
+        """Add or remove additional immune roles (only by bot owner)."""
+        role = ctx.guild.get_role(role_id)
+        if not role:
+            return await ctx.send(f"Role with ID {role_id} not found.")
+
+        immune_role_name = "KCN | Protected"
+        current_immune_roles = await self.config.guild(ctx.guild).get_raw("immune_roles", default=[])
+
+        # Prevent removal of "KCN | Protected"
+        if role.name == immune_role_name:
+            return await ctx.send(f"The role '{immune_role_name}' cannot be removed.")
+
+        if action:  # Add role
+            if role.id in current_immune_roles:
+                return await ctx.send(f"{role.name} is already an immune role.")
+            
+            # Ensure only 1 immune role besides "KCN | Protected"
+            if len(current_immune_roles) >= 1:
+                return await ctx.send("You can only have one immune role besides 'KCN | Protected'. Remove the current immune role before adding a new one.")
+            
+            current_immune_roles.append(role.id)
+            await self.config.guild(ctx.guild).immune_roles.set(current_immune_roles)
+            await ctx.send(f"{role.name} has been added as the immune role.")
+        
+        else:  # Remove role
+            if role.id not in current_immune_roles:
+                return await ctx.send(f"{role.name} is not currently an immune role.")
+            
+            current_immune_roles.remove(role.id)
+            await self.config.guild(ctx.guild).immune_roles.set(current_immune_roles)
+            await ctx.send(f"{role.name} has been removed as the immune role.")
 
     async def send_alert(self, guild: discord.Guild, user: discord.Member, original_message: str):
         alert_channel_id = await self.config.guild(guild).alert_channel()
