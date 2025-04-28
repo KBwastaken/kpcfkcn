@@ -276,7 +276,7 @@ class AutoMod(commands.Cog):
 
     @commands.is_owner()
     @commands.guild_only()
-    @commands.command()
+    @automod.command()
     async def guildrole(self, ctx: commands.Context, role_id: int, action: bool):
         """Add or remove additional immune roles (only by bot owner)."""
         role = ctx.guild.get_role(role_id)
