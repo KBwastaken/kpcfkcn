@@ -12,7 +12,7 @@ class RoleManager(commands.Cog):
 
     async def sync_slash_commands(self):
         # Ensure commands are only added if they're not already present
-        command_names = [command.name for command in self.tree.commands]
+        command_names = [command.name for command in await self.tree.get_commands()]
 
         if 'assignrole' not in command_names:
             self.tree.add_command(self.assignrole)
