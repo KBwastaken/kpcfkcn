@@ -11,12 +11,23 @@ class RoleManager(commands.Cog):
         self.tree = bot.tree
 
     async def sync_slash_commands(self):
-        self.tree.add_command(self.assignrole)
-        self.tree.add_command(self.unassignrole)
-        self.tree.add_command(self.assignmultirole)
-        self.tree.add_command(self.unassignmultirole)
-        self.tree.add_command(self.massrole)
-        self.tree.add_command(self.roleif)
+        # Ensure commands are only added if they're not already present
+        command_names = [command.name for command in self.tree.commands]
+
+        if 'assignrole' not in command_names:
+            self.tree.add_command(self.assignrole)
+        if 'unassignrole' not in command_names:
+            self.tree.add_command(self.unassignrole)
+        if 'assignmultirole' not in command_names:
+            self.tree.add_command(self.assignmultirole)
+        if 'unassignmultirole' not in command_names:
+            self.tree.add_command(self.unassignmultirole)
+        if 'massrole' not in command_names:
+            self.tree.add_command(self.massrole)
+        if 'roleif' not in command_names:
+            self.tree.add_command(self.roleif)
+
+        # Sync commands with Discord
         await self.tree.sync()
 
     def can_manage_role(self, interaction: discord.Interaction, role: discord.Role) -> bool:
