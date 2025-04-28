@@ -142,6 +142,10 @@ class ServerBan(red_commands.Cog):
         result.set_footer(text=f"Requested by {interaction.user.display_name}")
         await interaction.followup.send(embed=result)
 
+        # If there were any failures, send them in an ephemeral message
+        if failed:
+            await interaction.followup.send(embed=self._error_embed("\n".join(failed)), ephemeral=True)
+
     @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
     @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
@@ -177,7 +181,7 @@ class ServerBan(red_commands.Cog):
             )
             ban_embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
             ban_embed.set_footer(text="Appeals are reviewed by the moderation team.")
-            await user.send(embed=ban_embed)
+            await interaction.followup.send(embed=ban_embed, ephemeral=False)  # Send the ban embed directly to the channel
         except discord.HTTPException:
             # If DM failed, log the failure and continue banning the user
             lines.append("❌ Failed to send DM to the user, but proceeding with the ban(s).")
@@ -209,6 +213,10 @@ class ServerBan(red_commands.Cog):
         summary.set_footer(text=f"Requested by {moderator}")
         await interaction.followup.send(embed=summary)
 
+        # If there were any failures, send them in an ephemeral message
+        if any('❌' in line for line in results):
+            await interaction.followup.send(embed=self._error_embed("\n".join([line for line in results if '❌' in line])), ephemeral=True)
+
     @app_commands.command(name="syncbans", description="Sync global bans to the current server.")
     @commands.is_owner()
     async def syncbans(self, interaction: discord.Interaction):
@@ -225,3 +233,7 @@ class ServerBan(red_commands.Cog):
 
         result_embed = discord.Embed(title="Ban Sync Results", description="\n".join(synced + failed), color=discord.Color.orange())
         await interaction.response.send_message(embed=result_embed)
+
+        # If there were any failures, send them in an ephemeral message
+        if failed:
+            await interaction.response.send_message(embed=self._error_embed("\n".join(failed)), ephemeral=True)
