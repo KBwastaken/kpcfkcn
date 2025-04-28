@@ -1,5 +1,4 @@
-# rolemanager/__init__.py
-from .rolemanager import RoleManager
+from .rolemanager import RoleManager  # No change, this should be correct
 
 async def setup(bot):
     cog = RoleManager(bot)
