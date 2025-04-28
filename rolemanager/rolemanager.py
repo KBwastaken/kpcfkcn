@@ -26,6 +26,10 @@ class RoleManager(commands.Cog):
         """Ensure commands are synced when the cog is loaded."""
         await self.sync_slash_commands()
 
+    async def cog_unload(self):
+        """Ensure commands are removed when the cog is unloaded."""
+        self.tree.clear_commands(guild=None)  # Clear commands globally on unload
+
     def has_higher_role(self, interaction: discord.Interaction, role: discord.Role):
         """Check if the bot or user can assign a role above their highest role."""
         user_top_role = interaction.user.top_role
