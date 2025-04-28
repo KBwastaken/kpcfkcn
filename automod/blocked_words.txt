@@ -2501,8 +2501,6 @@
   "wiggas",
   "wigger",
   "wiggers",
-  "willie",
-  "willies",
   "williewanker",
   "willy",
   "wog",
@@ -2512,8 +2510,6 @@
   "worldsex",
   "wrapping men",
   "wrinkled starfish",
-  "wtf",
-  "wuss",
   "wuzzie",
   "x-rated",
   "x-rated2g1c",
@@ -2535,9 +2531,7 @@
   "yids",
   "yiffy",
   "yobbo",
-  "yourboobs",
   "yourpenis",
-  "yourtits",
   "yury",
   "zabourah",
   "zigabo",
@@ -2546,5 +2540,3 @@
   "zipperheads",
   "zoophile",
   "zoophilia",
-  "🖕"
-]
