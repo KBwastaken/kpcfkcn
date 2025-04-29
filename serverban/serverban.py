@@ -50,7 +50,7 @@ class ServerBan(red_commands.Cog):
             "added_by": str(interaction.user)
         }
 
-        return await interaction.response.send_message(embed=self._success_embed("User added to the Do Not Unban list."), ephemeral=True)
+        return await interaction.response.send_message(embed=self._success_embed("User added to the Do Not Unban list."), ephemeral=False)
 
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
