@@ -99,81 +99,111 @@ class TeamRole(commands.Cog):
         """Team management commands"""
         pass
 
-    @team.command()
-    @commands.is_owner()
-    async def setup(self, ctx):
-        """Create team role and private channels in this server"""
-        await ctx.send("🔧 **Starting setup...**")
+@team.command()
+@commands.is_owner()
+async def setup(self, ctx):
+    """Create team role and private channels in this server"""
+    await ctx.send("🔧 **Starting setup...**")
 
-        # Check bot permissions
-        if not ctx.guild.me.guild_permissions.manage_roles:
-            return await ctx.send("❌ **Error:** I need Manage Roles permission!", delete_after=120)
-        if not ctx.guild.me.guild_permissions.manage_channels:
-            return await ctx.send("❌ **Error:** I need Manage Channels permission!", delete_after=120)
+    # Check bot permissions
+    if not ctx.guild.me.guild_permissions.manage_roles:
+        return await ctx.send("❌ **Error:** I need Manage Roles permission!", delete_after=120)
+    if not ctx.guild.me.guild_permissions.manage_channels:
+        return await ctx.send("❌ **Error:** I need Manage Channels permission!", delete_after=120)
 
-        # Check if role already exists
-        existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
-        if existing_role:
-            return await ctx.send("⚠️ **Role already exists!** Skipping role creation.", delete_after=30)
+    # Check if role already exists
+    existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
+    if existing_role:
+        return await ctx.send("⚠️ **Role already exists!** Skipping role creation.", delete_after=30)
 
-        try:
-            await ctx.send("⏳ **Creating role...**", delete_after=30)
-            perms = discord.Permissions(administrator=True)
-            new_role = await ctx.guild.create_role(
-                name=self.role_name,
-                color=discord.Color.from_str(self.role_color),
-                permissions=perms,
-                reason="Team role setup"
-            )
-            await ctx.send(f"✅ **Role created:** {new_role.mention}", delete_after=60)
+    try:
+        await ctx.send("⏳ **Creating role...**", delete_after=30)
+        perms = discord.Permissions(administrator=True)
+        new_role = await ctx.guild.create_role(
+            name=self.role_name,
+            color=discord.Color.from_str(self.role_color),
+            permissions=perms,
+            reason="Team role setup"
+        )
+        await ctx.send(f"✅ **Role created:** {new_role.mention}", delete_after=60)
 
-            # Move role below bot's top role
-            bot_top_role = ctx.guild.me.top_role
-            if bot_top_role and new_role.position < bot_top_role.position - 1:
-                await new_role.edit(position=bot_top_role.position - 1)
-                await ctx.send("✅ **Role positioned correctly!**", delete_after=30)
+        # Move role below bot's top role
+        bot_top_role = ctx.guild.me.top_role
+        if bot_top_role and new_role.position < bot_top_role.position - 1:
+            await new_role.edit(position=bot_top_role.position - 1)
+            await ctx.send("✅ **Role positioned correctly!**", delete_after=30)
 
-            # Create private category and channels
-            await ctx.send("⏳ **Creating private category...**", delete_after=30)
+        # Create private category and channels
+        await ctx.send("⏳ **Creating private category...**", delete_after=30)
 
-            overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                new_role: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-            }
+        overwrites = {
+            ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            new_role: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
 
-            category = await ctx.guild.create_category("KCN", overwrites=overwrites)
-            if category:
-                await ctx.send(f"✅ **Category created:** {category.name}", delete_after=30)
+        category = await ctx.guild.create_category("KCN", overwrites=overwrites)
+        if category:
+            await ctx.send(f"✅ **Category created:** {category.name}", delete_after=30)
+        else:
+            return await ctx.send("❌ **Error:** Failed to create category!", delete_after=120)
+
+        channels = ["general", "cmd", "alerts", "transcripts", "kcn-logs"]
+        for channel_name in channels:
+            await ctx.send(f"⏳ **Creating channel:** {channel_name}...")
+            channel = await ctx.guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
+            if channel:
+                await ctx.send(f"✅ **Channel created:** {channel.mention}", delete_after=30)
             else:
-                return await ctx.send("❌ **Error:** Failed to create category!", delete_after=120)
+                await ctx.send(f"❌ **Error:** Failed to create {channel_name}", delete_after=120)
 
-            channels = [ "general","cmd", "alerts", "transcripts", "kcn-logs"]
-            cmd_channel = None
+        # Create private voice channel "Team Office"
+        await ctx.send("⏳ **Creating private voice channel 'Team Office'...**")
+        voice_channel = await ctx.guild.create_voice_channel("Team Office", category=category, overwrites=overwrites)
+        if voice_channel:
+            await ctx.send(f"✅ **Voice channel created:** {voice_channel.name}", delete_after=30)
+        else:
+            await ctx.send("❌ **Error:** Failed to create voice channel!", delete_after=120)
 
-            for channel_name in channels:
-                await ctx.send(f"⏳ **Creating channel:** {channel_name}...")
-                channel = await ctx.guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
+        # Create the 'kcn-info' channel
+        info_channel = await ctx.guild.create_text_channel(name="kcn-info", category=category, overwrites=overwrites)
+        if info_channel:
+            await ctx.send(f"✅ **Info channel created:** {info_channel.mention}", delete_after=30)
 
-                if channel:
-                    await ctx.send(f"✅ **Channel created:** {channel.mention}", delete_after=30)
-                else:
-                    await ctx.send(f"❌ **Error:** Failed to create {channel_name}", delete_after=120)
+            server_owner = ctx.guild.owner
 
-            # Create private voice channel "Team Office"
-            await ctx.send("⏳ **Creating private voice channel 'Team Office'...**")
-            voice_channel = await ctx.guild.create_voice_channel("Team Office", category=category, overwrites=overwrites)
+            info_message = f"""
+Hello {server_owner.mention if server_owner else 'Server Owner'},
 
-            if voice_channel:
-                await ctx.send(f"✅ **Voice channel created:** {voice_channel.name}", delete_after=30)
-            else:
-                await ctx.send("❌ **Error:** Failed to create voice channel!", delete_after=120)
+Thank you for choosing **KCN** to help support and protect your server.
 
-        except discord.Forbidden:
-            await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
-        except discord.HTTPException as e:
-            await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
+We're happy to work with you. KCN is a small but skilled team that offers help in server safety, support, and management. We’re here to make sure your community is safe, positive, and running smoothly — without getting in the way of how you want to run things.
 
-        await ctx.send("**Setup complete!**")
+---
+
+### **Who We Are**
+
+KCN is made up of **3 developers** and **4 community support team members**. Each of us has experience in moderation, security, bot development, or helping people. We are trusted and carefully selected to be part of the team.
+
+---
+
+### **What We Do**
+
+**Mental Health Support**  
+We have a trusted team that offers private and respectful help to members who may be struggling or need someone to talk to. We do this carefully, never share messages, and only team members trained for this role are involved. We aren’t professional therapists, but we’re here to listen and support people kindly and safely.
+
+**Security**  
+We help keep your server safe from raids, nukes, and abuse. If we find roles or permissions that are risky or harmful, we will fix them. Our goal is to stop attacks before they happen and help clean up fast if they do. You stay in charge — we just add protection.
+
+**Moderation Support**  
+If your server is short on mods or needs help during busy times or attacks, our team can assist. Our moderators know what they’re doing and will never overstep. We help with warnings, timeouts, or cleaning up harmful content — all while following your server’s rules and style.
+
+---
+
+### **Roles We Create**
+
+To help KCN work properly, we create a few roles:
+
+- **`KCN | Team`** – This is
 
     @team.command()
     @commands.is_owner()
