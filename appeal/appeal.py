@@ -10,4 +10,5 @@ class Appeal(commands.Cog):
     async def appeal(self, ctx):
         """Sends the appeal form link."""
         await ctx.send("oopsie whoopsie got yourself or a friend of yours banned?)  
-Fix it here/https://forms.gle/gR6f9iaaprASRgyP9")
+Fix it here\n\n"
+"https://forms.gle/gR6f9iaaprASRgyP9"),
