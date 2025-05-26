@@ -11,6 +11,7 @@ class Raid(commands.Cog):
         default_guild = {
             "authorised_roles": [],
             "alert_channel": None,
+            "alert_role": None,
             "use_alert_role": False
         }
         self.config.register_guild(**default_guild)
