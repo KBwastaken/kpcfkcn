@@ -79,32 +79,37 @@ class Raid(commands.Cog):
         member = ctx.author
 
         alert_channel_id = await self.config.guild(guild).alert_channel()
+        alert_role_id = await self.config.guild(guild).alert_role()
         use_alert_role = await self.config.guild(guild).use_alert_role()
         authorised_roles = await self.config.guild(guild).authorised_roles()
 
-        # Check authorisation
         if not any(role.id in authorised_roles for role in member.roles):
             return await ctx.send("You are not authorised to run this command.")
 
-        # Resolve alert channel
         alert_channel = guild.get_channel(alert_channel_id)
         if alert_channel is None:
             return await ctx.send("Alert channel not set or invalid.")
 
-        alert_mention = "@here" if use_alert_role else ""
+        # Get role mention and allow only that role to be pinged
+        role = guild.get_role(alert_role_id) if alert_role_id and use_alert_role else None
+        role_mention = role.mention if role else ""
+        allowed_mentions = discord.AllowedMentions(roles=[role]) if role else discord.AllowedMentions.none()
+
+        # Initial alert message
         confirm_text = (
-            f"{alert_mention} YOUR BASE IS BEING RAIDED\n"
+            f"{role_mention} YOUR BASE IS BEING RAIDED\n"
             f"= # Action confirmed by {ctx.author.name}"
         )
-        await alert_channel.send(confirm_text)
+        await alert_channel.send(content=confirm_text, allowed_mentions=allowed_mentions)
 
-        # Send alert messages
+        # Repeating pings
         for _ in range(4):
-            msg = await alert_channel.send(alert_mention)
+            msg = await alert_channel.send(content=role_mention, allowed_mentions=allowed_mentions)
             await asyncio.sleep(1)
             try:
                 await msg.delete()
             except discord.NotFound:
                 pass
             await asyncio.sleep(1)
+
 
