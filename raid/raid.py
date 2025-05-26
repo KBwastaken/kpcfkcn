@@ -51,11 +51,25 @@ class Raid(commands.Cog):
             await ctx.send("Alert channel has been unset.")
 
     @raid.command()
-    async def setalertrole(self, ctx, state: bool):
-        """Enable or disable alert role pings"""
-        await self.config.guild(ctx.guild).use_alert_role.set(state)
-        status = "enabled" if state else "disabled"
-        await ctx.send(f"Alert role pings have been {status}.")
+    async def setalertrole(self, ctx, role_id: str, state: bool):
+        """Set or unset the alert role to be pinged"""
+        try:
+            role_id = int(role_id.strip("<@&>"))
+        except ValueError:
+            return await ctx.send("Invalid role ID or mention.")
+
+        role = ctx.guild.get_role(role_id)
+        if not role:
+            return await ctx.send("Role not found in this server.")
+
+        if state:
+            await self.config.guild(ctx.guild).alert_role.set(role.id)
+            await self.config.guild(ctx.guild).use_alert_role.set(True)
+            await ctx.send(f"Alert role set to {role.mention}")
+        else:
+            await self.config.guild(ctx.guild).alert_role.set(None)
+            await self.config.guild(ctx.guild).use_alert_role.set(False)
+            await ctx.send("Alert role disabled.")
 
     @raid.command()
     async def confirm(self, ctx):
