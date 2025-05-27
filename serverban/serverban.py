@@ -169,11 +169,14 @@ class ServerBan(red_commands.Cog):
             self.global_ban_list.discard(user_id)
 
         await interaction.followup.send(embed=discord.Embed(title="Unban Results", description="\n".join(results), color=discord.Color.orange()))
-
+        
     @app_commands.command(name="bansync", description="Sync all globally banned users to this server.")
-    @app_commands.checks.is_owner()
     async def bansync(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+            return await interaction.response.send_message(
+            embed=self._error_embed("You are not authorized to use this command."),
+            ephemeral=True
+        )
         results = []
         for user_id in self.global_ban_list:
             try:
