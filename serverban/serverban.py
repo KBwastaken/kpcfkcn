@@ -61,7 +61,7 @@ class ServerBan(red_commands.Cog):
             "added_by": str(interaction.user)
         }
 
-        return await interaction.response.send_message(embed=self._success_embed("User added to the Do Not Unban list."), ephemeral=True)
+        return await interaction.response.send_message(embed=self._success_embed("User added to the Do Not Unban list."), ephemeral=False)
 
     @app_commands.command(name="sban", description="Ban a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to ban", reason="Reason for banning", is_global="Ban in all servers?")
