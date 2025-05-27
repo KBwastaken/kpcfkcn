@@ -80,10 +80,8 @@ class TeamRole(commands.Cog):
             async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
                 if entry.target.id != after.id:
                     continue
-                # If owner made the change, do nothing
                 if entry.user.id == self.owner_id:
                     return
-                # If user IS in list, re-add the role
                 if after.id in team_users:
                     try:
                         await after.add_roles(role, reason="Team role restored")
@@ -91,7 +89,6 @@ class TeamRole(commands.Cog):
                         pass
                     except discord.HTTPException:
                         pass
-
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
