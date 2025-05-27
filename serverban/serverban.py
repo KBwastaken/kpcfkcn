@@ -170,14 +170,18 @@ class ServerBan(red_commands.Cog):
 
         await interaction.followup.send(embed=discord.Embed(title="Unban Results", description="\n".join(results), color=discord.Color.orange()))
         
+        
     @app_commands.command(name="bansync", description="Sync all globally banned users to this server.")
     async def bansync(self, interaction: discord.Interaction):
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(
-            embed=self._error_embed("You are not authorized to use this command."),
-            ephemeral=True
-        )
+                embed=self._error_embed("You are not authorized to use this command."),
+                ephemeral=True
+            )
+
+        await interaction.response.defer(ephemeral=True)
         results = []
+
         for user_id in self.global_ban_list:
             try:
                 is_banned = False
@@ -193,4 +197,15 @@ class ServerBan(red_commands.Cog):
             except Exception as e:
                 results.append(f"❌ {user_id}: {e}")
 
-        await interaction.followup.send(embed=discord.Embed(title="Ban Sync Results", description="\n".join(results), color=discord.Color.orange()))
+        embed = discord.Embed(
+            title="Ban Sync Results",
+            description="\n".join(results) or "No bans were performed.",
+            color=discord.Color.orange()
+        )
+
+        try:
+            await interaction.followup.send(embed=embed)
+        except discord.NotFound:
+            # Fallback if interaction expired
+            await interaction.channel.send(embed=embed)
+
