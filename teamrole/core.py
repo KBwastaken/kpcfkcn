@@ -170,13 +170,6 @@ class TeamRole(commands.Cog):
             await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
 
         await ctx.send("**Setup complete!**")
-    
-        except discord.Forbidden:
-            await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
-        except discord.HTTPException as e:
-            await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
-
-        await ctx.send("**Setup complete!**")
 
     @team.command()
     @commands.is_owner()
