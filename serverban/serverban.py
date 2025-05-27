@@ -137,6 +137,7 @@ class ServerBan(red_commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
+        # Do Not Unban check
         if user_id in self.blacklisted_users:
             info = self.blacklisted_users[user_id]
             embed = discord.Embed(
@@ -150,6 +151,7 @@ class ServerBan(red_commands.Cog):
 
         guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
         results = []
+
         for guild in guilds:
             try:
                 await guild.unban(discord.Object(id=user_id), reason=reason)
@@ -159,16 +161,31 @@ class ServerBan(red_commands.Cog):
 
         try:
             user = await self.bot.fetch_user(user_id)
-            dm_embed = discord.Embed(title="You have been unbanned", description=f"Reason: {reason}", color=discord.Color.green())
+            dm_embed = discord.Embed(
+                title="You have been unbanned",
+                description=f"Reason: {reason}",
+                color=discord.Color.green()
+            )
             await user.send(embed=dm_embed)
-            await interaction.channel.send(embed=self._action_embed(user, "unban", reason, moderator, is_global))
         except discord.HTTPException:
             pass
 
         if is_global:
             self.global_ban_list.discard(user_id)
 
-        await interaction.followup.send(embed=discord.Embed(title="Unban Results", description="\n".join(results), color=discord.Color.orange()))
+        # Send result summary
+        await interaction.followup.send(embed=discord.Embed(
+            title="Unban Results",
+            description="\n".join(results),
+            color=discord.Color.orange()
+        ))
+
+        # Post action log embed to the channel (just like in sban)
+        try:
+            await interaction.channel.send(embed=self._action_embed(user, "unban", reason, moderator, is_global))
+        except Exception:
+            pass
+
         
         
     @app_commands.command(name="bansync", description="Sync all globally banned users to this server.")
