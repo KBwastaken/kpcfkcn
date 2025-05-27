@@ -164,110 +164,13 @@ class TeamRole(commands.Cog):
             else:
                 await ctx.send("❌ **Error:** Failed to create voice channel!", delete_after=120)
 
-try:
-    await ctx.send("⏳ **Creating private text channel: kcn-info**", delete_after=30)
-    info_channel = await ctx.guild.create_text_channel("kcn-info", category=category, overwrites=overwrites)
-    if info_channel:
-        await ctx.send(f"✅ **Channel created:** {info_channel.mention}", delete_after=30)
-
-        # Send the information message in parts to avoid exceeding character limits
-        info_message_part1 = f"""
-Hello {server_owner.mention if server_owner else 'Server Owner'},
-
-Thank you for choosing **KCN** to help support and protect your server.
-
-We're happy to work with you. KCN is a small but skilled team that offers help in server safety, support, and management. We’re here to make sure your community is safe, positive, and running smoothly — without getting in the way of how you want to run things.
-
----
-
-### **Who We Are**
-
-KCN is made up of **3 developers** and **4 community support team members**. Each of us has experience in moderation, security, bot development, or helping people. We are trusted and carefully selected to be part of the team.
-"""
-        await info_channel.send(info_message_part1)
-
-        info_message_part2 = """
----
-
-### **What We Do**
-
-**Mental Health Support**  
-We have a trusted team that offers private and respectful help to members who may be struggling or need someone to talk to. We do this carefully, never share messages, and only team members trained for this role are involved. We aren’t professional therapists, but we’re here to listen and support people kindly and safely.
-
-**Security**  
-We help keep your server safe from raids, nukes, and abuse. If we find roles or permissions that are risky or harmful, we will fix them. Our goal is to stop attacks before they happen and help clean up fast if they do. You stay in charge — we just add protection.
-
-**Moderation Support**  
-If your server is short on mods or needs help during busy times or attacks, our team can assist. Our moderators know what they’re doing and will never overstep. We help with warnings, timeouts, or cleaning up harmful content — all while following your server’s rules and style.
-"""
-        await info_channel.send(info_message_part2)
-
-        info_message_part3 = """
----
-
-### **Roles We Create**
-
-To help KCN work properly, we create a few roles:
-
-- **`KCN | Team`** – This is given to official KCN members. These people are trained and can help you directly if needed. If someone has this role, they are trusted and safe to talk to.
-
-- **`KCN | Protected`** – This is only for **server owners** and the **most trusted people** you choose. Anyone with this role is not affected by our automod or moderation actions.
-
-- **`KCN.gg`** – This is a system role for our bots and tools to work properly. Please don’t edit or remove it.
-
-These roles are made to help **KCN function**, not to replace your roles or staff.
-
----
-
-### **How It Works**
-
-KCN runs on a custom system built using **Redbot** and hosted on our own secure server. We don’t rely on outside services. All our code and tools are written by us, and your data stays safe and private at all times. We only store what’s needed to keep things working smoothly.
-
----
-
-### **Need Help?**
-
-If you ever have questions or need support, just message **anyone with the `KCN | Team` role**. They know how our bots and systems work and will help you as best they can.
-
-We’re proud to be working with you and we’ll always do our best to protect your community while respecting your leadership.
-
-Thanks again,  
-**— The KCN Team**
-"""
-        await info_channel.send(info_message_part3)
-
-    else:
-        await ctx.send("⚠️ **Could not create the kcn-info channel.**", delete_after=30)
-
-except discord.Forbidden:
-    await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
-except discord.HTTPException as e:
-    await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
-                await info_channel.send(info_message_part3)
-
-            else:
-                await ctx.send("⚠️ **Could not create the kcn-info channel.**", delete_after=30)
-
-        except discord.Forbidden:
-            await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
-        except discord.HTTPException as e:
-            await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
-                await info_channel.send(info_message_part3)
-
-            else:
-                await ctx.send("⚠️ **Could not create the kcn-info channel.**", delete_after=30)
-
         except discord.Forbidden:
             await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
         except discord.HTTPException as e:
             await ctx.send(f"❌ **Error:** Failed to create role or channels! {e}", delete_after=120)
 
         await ctx.send("**Setup complete!**")
-                # Send the message in the new info channel
-                await info_channel.send(info_message)
-            else:
-                await ctx.send("⚠️ **Could not create the kcn-info channel.**", delete_after=30)
-
+    
         except discord.Forbidden:
             await ctx.send("❌ **Error:** I need Manage Roles and Manage Channels permissions!", delete_after=120)
         except discord.HTTPException as e:
