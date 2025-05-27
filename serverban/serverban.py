@@ -28,7 +28,7 @@ class ServerBan(red_commands.Cog):
         description = f"{user.mention} has been {'globally ' if is_global else ''}{action}ned for: {reason}"
         embed = discord.Embed(title=title, description=description, color=discord.Color.red() if action == "ban" else discord.Color.green())
         embed.set_footer(text=f"Command requested by {moderator.name}")
-        embed.set_image(url=BAN_GIF if action == "ban" else UNBAN_GIF)
+        embed.set_thumbnail(url=BAN_GIF if action == "ban" else UNBAN_GIF)
         return embed
 
     @commands.Cog.listener()
