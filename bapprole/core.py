@@ -69,7 +69,7 @@ class bapprole(commands.Cog):
 
 @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
 @app_commands.describe(reason="Reason for your request")
-async def request_admin(self, interaction: discord.Interaction, reason: str):
+async def request_admin(self, interaction, reason: str):
     await interaction.response.defer(ephemeral=True)
 
     settings = await self.config.admin_settings()
