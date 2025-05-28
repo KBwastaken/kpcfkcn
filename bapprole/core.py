@@ -26,6 +26,7 @@ class bapprole(commands.Cog):
 
     @loop(seconds=7200)
     async def update_loop(self):
+    async def setup_slash_command(self):
     for guild in self.bot.guilds:
         try:
             role = discord.utils.get(guild.roles, name=self.role_name)
