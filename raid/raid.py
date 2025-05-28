@@ -98,7 +98,8 @@ class Raid(commands.Cog):
         # Initial alert message
         confirm_text = (
             f"{role_mention} YOUR BASE IS BEING RAIDED\n"
-            f"= # Action confirmed by {ctx.author.name}"
+            f"calling Kaya...\n"
+            f"-# Action confirmed by {ctx.author.name}\n"
         )
         await alert_channel.send(content=confirm_text, allowed_mentions=allowed_mentions)
 
