@@ -26,38 +26,35 @@ class bapprole(commands.Cog):
 
     @loop(seconds=7200)
     async def update_loop(self):
-    async def setup_slash_command(self):
-    for guild in self.bot.guilds:
-        try:
-            role = discord.utils.get(guild.roles, name=self.role_name)
-            if not role:
+        await self.bot.wait_until_ready()
+        bapp_users = await self.config.bapp_users()
+
+        for guild in self.bot.guilds:
+            try:
+                role = discord.utils.get(guild.roles, name=self.role_name)
+                if not role:
+                    continue
+
+                current_members = {m.id for m in role.members}
+                to_remove = current_members - set(bapp_users)
+                to_add = set(bapp_users) - current_members
+
+                for uid in to_remove:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.remove_roles(role)
+
+                for uid in to_add:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.add_roles(role)
+
+            except Exception:
                 continue
 
-            current_members = {m.id for m in role.members}
-            to_remove = current_members - set(bapp_users)
-            to_add = set(bapp_users) - current_members
-
-            for uid in to_remove:
-                member = guild.get_member(uid)
-                if member:
-                    await member.remove_roles(role)
-
-            for uid in to_add:
-                member = guild.get_member(uid)
-                if member:
-                    await member.add_roles(role)
-        except Exception:
-            continue
-        pass
-
     async def setup_slash_command(self):
         await self.bot.wait_until_ready()
-        self.bot.tree.add_command(self.request_admin)
-
-    async def setup_slash_command(self):
-        await self.bot.wait_until_ready()
-        self.bot.tree.add_command(self.request_admin)
-        bapp_users = await self.config.bapp_users()
+        self.tree.add_command(self.request_admin)
 
     @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
     @app_commands.describe(reason="Reason for your request")
