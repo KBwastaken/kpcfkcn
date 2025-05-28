@@ -68,58 +68,59 @@ class bapprole(commands.Cog):
         await ctx.send(f"Admin request channel set to {channel.mention} and role set to {role.name}.")
 
 
-@app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
-@app_commands.describe(reason="Reason for your request")
-async def request_admin(self, interaction: Interaction, reason: str):
-    await interaction.response.defer(ephemeral=True)
+    @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
+    @app_commands.describe(reason="Reason for your request")
+    async def request_admin(self, interaction: Interaction, reason: str):
+        await interaction.response.defer(ephemeral=True)
 
-    settings = await self.config.admin_settings()
-    if not settings:
-        return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
+        settings = await self.config.admin_settings()
+        if not settings:
+            await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
+            return
 
-    channel = self.bot.get_channel(settings.get("channel_id"))
-    role = interaction.guild.get_role(settings.get("role_id"))
-    if not channel or not role:
-        return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
+        channel = self.bot.get_channel(settings.get("channel_id"))
+        role = interaction.guild.get_role(settings.get("role_id"))
+        if not channel or not role:
+            await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
+            return
 
-    embed = discord.Embed(
-        title="Admin Role Request",
-        description=f"**User:** {interaction.user.mention}\n**Reason:** {reason}",
-        color=discord.Color.orange()
-    )
-
-    role_ping_text = role.mention
-    allowed_mentions = discord.AllowedMentions(roles=True)
-
-    await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
-
-    request_msg = await channel.send(embed=embed, allowed_mentions=allowed_mentions)
-    await request_msg.add_reaction("✅")
-    await request_msg.add_reaction("❌")
-
-    def check(reaction, user):
-        return (
-            user.guild_permissions.administrator and
-            str(reaction.emoji) in ["✅", "❌"] and
-            reaction.message.id == request_msg.id
+        embed = Embed(
+            title="Admin Role Request",
+            description=f"**User:** {interaction.user.mention}\n**Reason:** {reason}",
+            color=Color.orange()
         )
 
-    try:
-        reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
-        if str(reaction.emoji) == "✅":
-            bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
-            if not bapp_role:
-                return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
+        allowed_mentions = discord.AllowedMentions(roles=True)
+        role_ping_text = role.mention
 
-            await interaction.user.add_roles(bapp_role)
-            await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
+        request_msg = await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
+        await request_msg.add_reaction("✅")
+        await request_msg.add_reaction("❌")
 
-            await asyncio.sleep(1800)  # 30 minutes
-            await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
-        else:
-            await interaction.followup.send("Request denied.", ephemeral=True)
-    except asyncio.TimeoutError:
-        await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
+        def check(reaction, user):
+            return (
+                user.guild_permissions.administrator and
+                str(reaction.emoji) in ["✅", "❌"] and
+                reaction.message.id == request_msg.id
+            )
+
+        try:
+            reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
+            if str(reaction.emoji) == "✅":
+                bapp_role = discord.utils.get(interaction.guild.roles, name="KCN.gg")
+                if not bapp_role:
+                    await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
+                    return
+
+                await interaction.user.add_roles(bapp_role)
+                await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
+
+                await asyncio.sleep(1800)  # 30 minutes
+                await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
+            else:
+                await interaction.followup.send("Request denied.", ephemeral=True)
+        except asyncio.TimeoutError:
+            await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
 
 
     async def red_delete_data_for_user(self, **kwargs):
