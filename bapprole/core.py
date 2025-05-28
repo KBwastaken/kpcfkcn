@@ -26,6 +26,9 @@ class bapprole(commands.Cog):
 
     @loop(seconds=7200)
     async def update_loop(self):
+    async def setup_slash_command(self):
+    await self.bot.wait_until_ready()
+    self.bot.tree.add_command(self.request_admin)
     bapp_users = await self.config.bapp_users()
     
     for guild in self.bot.guilds:
