@@ -1,9 +1,9 @@
-import discord
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.tasks import loop
 from discord import app_commands
+import discord
 import asyncio
 
 class bapprole(commands.Cog):
@@ -14,17 +14,92 @@ class bapprole(commands.Cog):
     role_color = "#77bcd6"
     hoist = True
 
-
-class bapprole(red_commands.Cog):
+class bapprole(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.tree = bot.tree
         self.config = Config.get_conf(self, identifier=78631109)
         self.config.register_global(bapp_users=[])
-        self.config.register_global(admin_settings={})  # channel_id, role_id
+        self.config.register_global(admin_settings={})
         self.bot.loop.create_task(self.setup_slash_command())
-        @loop(seconds=7200)  # Every 2h
+        self.update_loop.start()
 
+    @loop(seconds=7200)
+    async def update_loop(self):
+    bapp_users = await self.config.bapp_users()
+    
+    for guild in self.bot.guilds:
+        try:
+            role = discord.utils.get(guild.roles, name=self.role_name)
+            if not role:
+                continue
+
+            current_members = {m.id for m in role.members}
+            to_remove = current_members - set(bapp_users)
+            to_add = set(bapp_users) - current_members
+
+            for uid in to_remove:
+                member = guild.get_member(uid)
+                if member:
+                    await member.remove_roles(role)
+
+            for uid in to_add:
+                member = guild.get_member(uid)
+                if member:
+                    await member.add_roles(role)
+        except Exception:
+            continue
+        pass
+
+    async def setup_slash_command(self):
+        await self.bot.wait_until_ready()
+        self.bot.tree.add_command(self.request_admin)
+
+    @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
+    @app_commands.describe(reason="Reason for your request")
+    async def request_admin(self, interaction: discord.Interaction, reason: str):
+    await interaction.response.defer(ephemeral=True)
+    
+    settings = await self.config.admin_settings()
+    if not settings:
+        return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
+
+    channel = self.bot.get_channel(settings["channel_id"])
+    role = interaction.guild.get_role(settings["role_id"])
+    if not channel or not role:
+        return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
+
+    embed = discord.Embed(
+        title="Admin Role Request",
+        description=f"**User:** {interaction.user.mention}\n"
+                    f"**Reason:** {reason}",
+        color=discord.Color.orange()
+    )
+    request_msg = await channel.send(content=role.mention, embed=embed)
+    await request_msg.add_reaction("✅")
+    await request_msg.add_reaction("❌")
+
+    def check(reaction, user):
+        return user.guild_permissions.administrator and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == request_msg.id
+
+    try:
+        reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
+        if str(reaction.emoji) == "✅":
+            bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
+            if not bapp_role:
+                return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
+
+            await interaction.user.add_roles(bapp_role)
+            await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
+
+            await asyncio.sleep(1800)
+            await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
+        else:
+            await interaction.followup.send("Request denied.", ephemeral=True)
+    except asyncio.TimeoutError:
+        await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
+        pass
+    
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
         pass
@@ -258,108 +333,11 @@ class bapprole(red_commands.Cog):
         
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
 
-    @commands.command()
-    @commands.is_owner()
-    async def adminroleset(self, ctx, channel: discord.TextChannel = None, role: discord.Role = None):
-        """Set or reset the admin request handler (channel + role)"""
-        current = await self.config.admin_settings()
-    
-        if channel and role:
-            await self.config.admin_settings.set({
-                "channel_id": channel.id,
-                "role_id": role.id
-            })
-            await ctx.send(f"Set admin request channel to {channel.mention} and role to {role.mention}")
-        elif current:
-            await ctx.send("An admin request channel/role is already set.\n"
-                           "Use the command again with channel and role to update or type `reset` to remove it.")
-
-            def check(m):
-                return m.author == ctx.author and m.channel == ctx.channel
-
-            try:
-                reply = await self.bot.wait_for("message", timeout=30, check=check)
-                if reply.content.lower().strip() == "reset":
-                    await self.config.admin_settings.set({})
-                    await ctx.send("Admin role request config has been reset.")
-            except asyncio.TimeoutError:
-                await ctx.send("Timed out waiting for response.")
-        else:
-            await ctx.send("Please provide a channel and a role to set.")
-
-        async def setup_slash_command(self):
-        await self.bot.wait_until_ready()
-        self.bot.tree.add_command(request_admin)
 
 
-    async def update_loop(self):
-        bapp_users = await self.config.bapp_users()
-    
-        for guild in self.bot.guilds:
-            try:
-                role = discord.utils.get(guild.roles, name=self.role_name)
-                if not role:
-                    continue
 
-                current_members = {m.id for m in role.members}
-                to_remove = current_members - set(bapp_users)
-                to_add = set(bapp_users) - current_members
 
-                for uid in to_remove:
-                    member = guild.get_member(uid)
-                    if member:
-                        await member.remove_roles(role)
 
-                for uid in to_add:
-                    member = guild.get_member(uid)
-                    if member:
-                        await member.add_roles(role)
-            except Exception:
-                continue
-
-    @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
-    @app_commands.describe(reason="Reason for your request")
-    async def request_admin(self, interaction: discord.Interaction, reason: str):
-        await interaction.response.defer(ephemeral=True)
-    
-        settings = await self.config.admin_settings()
-        if not settings:
-            return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
-
-        channel = self.bot.get_channel(settings["channel_id"])
-        role = interaction.guild.get_role(settings["role_id"])
-        if not channel or not role:
-            return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
-
-        embed = discord.Embed(
-            title="Admin Role Request",
-            description=f"**User:** {interaction.user.mention}\n"
-                        f"**Reason:** {reason}",
-            color=discord.Color.orange()
-        )
-        request_msg = await channel.send(content=role.mention, embed=embed)
-        await request_msg.add_reaction("✅")
-        await request_msg.add_reaction("❌")
-
-        def check(reaction, user):
-            return user.guild_permissions.administrator and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == request_msg.id
-
-        try:
-            reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
-            if str(reaction.emoji) == "✅":
-                bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
-                if not bapp_role:
-                    return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
-
-                await interaction.user.add_roles(bapp_role)
-                await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
-
-                await asyncio.sleep(1800)
-                await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
-            else:
-                await interaction.followup.send("Request denied.", ephemeral=True)
-        except asyncio.TimeoutError:
-            await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
 
 
 
