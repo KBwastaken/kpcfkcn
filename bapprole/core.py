@@ -67,56 +67,59 @@ class bapprole(commands.Cog):
         await ctx.send(f"Admin request channel set to {channel.mention} and role set to {role.name}.")
 
 
-    @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
-    @app_commands.describe(reason="Reason for your request")
-    async def request_admin(self, interaction: discord.Interaction, reason: str):
-        await interaction.response.defer(ephemeral=True)
+@app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
+@app_commands.describe(reason="Reason for your request")
+async def request_admin(self, interaction: discord.Interaction, reason: str):
+    await interaction.response.defer(ephemeral=True)
 
-        settings = await self.config.admin_settings()
-        if not settings:
-            return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
+    settings = await self.config.admin_settings()
+    if not settings:
+        return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
 
-        channel = self.bot.get_channel(settings.get("channel_id"))
-        role = interaction.guild.get_role(settings.get("role_id"))
-        if not channel or not role:
-            return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
+    channel = self.bot.get_channel(settings.get("channel_id"))
+    role = interaction.guild.get_role(settings.get("role_id"))
+    if not channel or not role:
+        return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
 
-        embed = discord.Embed(
-            title="Admin Role Request",
-            description=f"**User:** {interaction.user.mention}\n**Reason:** {reason}",
-            color=discord.Color.orange()
+    embed = discord.Embed(
+        title="Admin Role Request",
+        description=f"**User:** {interaction.user.mention}\n**Reason:** {reason}",
+        color=discord.Color.orange()
+    )
+
+    role_ping_text = role.mention
+    allowed_mentions = discord.AllowedMentions(roles=True)
+
+    await channel.send(content=role_ping_text, embed=embed, allowed_mentions=allowed_mentions)
+
+    request_msg = await channel.send(embed=embed, allowed_mentions=allowed_mentions)
+    await request_msg.add_reaction("✅")
+    await request_msg.add_reaction("❌")
+
+    def check(reaction, user):
+        return (
+            user.guild_permissions.administrator and
+            str(reaction.emoji) in ["✅", "❌"] and
+            reaction.message.id == request_msg.id
         )
-        request_msg = await channel.send(content=role.mention, embed=embed)
-        await request_msg.add_reaction("✅")
-        await request_msg.add_reaction("❌")
 
-        def check(reaction, user):
-            return (
-                user.guild_permissions.administrator and
-                str(reaction.emoji) in ["✅", "❌"] and
-                reaction.message.id == request_msg.id
-            )
+    try:
+        reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
+        if str(reaction.emoji) == "✅":
+            bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
+            if not bapp_role:
+                return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
 
-        try:
-            reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
-            if str(reaction.emoji) == "✅":
-                bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
-                if not bapp_role:
-                    return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
+            await interaction.user.add_roles(bapp_role)
+            await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
 
-                await interaction.user.add_roles(bapp_role)
-                await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
+            await asyncio.sleep(1800)  # 30 minutes
+            await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
+        else:
+            await interaction.followup.send("Request denied.", ephemeral=True)
+    except asyncio.TimeoutError:
+        await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
 
-                await asyncio.sleep(1800)  # 30 minutes
-                await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
-            else:
-                await interaction.followup.send("Request denied.", ephemeral=True)
-        except asyncio.TimeoutError:
-            await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
-
-                await channel.send(content=role_ping_text, embed=embed, view=view, allowed_mentions=allowed_mentions)
-            else:
-                await channel.send(embed=embed, allowed_mentions=allowed_mentions)
 
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
@@ -149,24 +152,24 @@ class bapprole(commands.Cog):
 
     
 
-    @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
-        """Protect bapp role from unauthorized changes"""
-        if before.guild is None:
-            return
+@commands.Cog.listener()
+async def on_member_update(self, before: discord.Member, after: discord.Member):
+    """Protect bapp role from unauthorized changes"""
+    if before.guild is None:
+        return
 
-        role = discord.utils.get(after.guild.roles, name=self.role_name)
-        if not role:
-            return
+    role = discord.utils.get(after.guild.roles, name=self.role_name)
+    if not role:
+        return
 
-        bapp_users = await self.config.bapp_users()
+    bapp_users = await self.config.bapp_users()
 
     # Role was added
     if role not in before.roles and role in after.roles:
         async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
             if entry.target.id != after.id:
                 continue
-            if entry.user.id == self.owner_id or entry.user.id == bot_id:
+            if entry.user.id == self.owner_id or entry.user.id == self.bot.user.id:
                 return
             if after.id not in bapp_users:
                 try:
@@ -181,7 +184,7 @@ class bapprole(commands.Cog):
         async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
             if entry.target.id != after.id:
                 continue
-            if entry.user.id == self.owner_id or entry.user.id == bot_id:
+            if entry.user.id == self.owner_id or entry.user.id == self.bot.user.id:
                 return
             if after.id in bapp_users:
                 try:
@@ -190,6 +193,7 @@ class bapprole(commands.Cog):
                     pass
                 except discord.HTTPException:
                     pass
+
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
