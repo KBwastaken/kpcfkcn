@@ -1,7 +1,7 @@
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
-from redbot.core.tasks import loop
+from discord.ext import tasks
 from discord import app_commands
 import discord
 import asyncio
@@ -23,7 +23,7 @@ class bapprole(commands.Cog):
         self.bot.loop.create_task(self.setup_slash_command())
         self.update_loop.start()
 
-    @loop(seconds=7200)
+    @tasks.loop(seconds=7200)
     async def update_loop(self):
         await self.bot.wait_until_ready()
         bapp_users = await self.config.bapp_users()
