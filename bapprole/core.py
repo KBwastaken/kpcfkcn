@@ -114,6 +114,10 @@ class bapprole(commands.Cog):
         except asyncio.TimeoutError:
             await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
 
+                await channel.send(content=role_ping_text, embed=embed, view=view, allowed_mentions=allowed_mentions)
+            else:
+                await channel.send(embed=embed, allowed_mentions=allowed_mentions)
+
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
         pass
