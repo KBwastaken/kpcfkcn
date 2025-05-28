@@ -8,13 +8,12 @@ import asyncio
 
 class bapprole(commands.Cog):
     """Manage bapp role across all servers"""
-    
+
     owner_id = 1174820638997872721  # Your owner ID
     role_name = "KCN.gg"
     role_color = "#77bcd6"
     hoist = True
 
-class bapprole(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.tree = bot.tree
@@ -56,55 +55,53 @@ class bapprole(commands.Cog):
         await self.bot.wait_until_ready()
         self.tree.add_command(self.request_admin)
 
-    async def some_function(self):
-        settings = await self.config.admin_settings()
-
     @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
     @app_commands.describe(reason="Reason for your request")
     async def request_admin(self, interaction: discord.Interaction, reason: str):
         await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(f"Requesting admin access for: {reason}", ephemeral=True)
-    
-    settings = await self.config.admin_settings()
-    if not settings:
-        return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
 
-    channel = self.bot.get_channel(settings["channel_id"])
-    role = interaction.guild.get_role(settings["role_id"])
-    if not channel or not role:
-        return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
+        settings = await self.config.admin_settings()
+        if not settings:
+            return await interaction.followup.send("Admin role request system not configured.", ephemeral=True)
 
-    embed = discord.Embed(
-        title="Admin Role Request",
-        description=f"**User:** {interaction.user.mention}\n"
-                    f"**Reason:** {reason}",
-        color=discord.Color.orange()
-    )
-    request_msg = await channel.send(content=role.mention, embed=embed)
-    await request_msg.add_reaction("✅")
-    await request_msg.add_reaction("❌")
+        channel = self.bot.get_channel(settings.get("channel_id"))
+        role = interaction.guild.get_role(settings.get("role_id"))
+        if not channel or not role:
+            return await interaction.followup.send("Configured channel or role is invalid.", ephemeral=True)
 
-    def check(reaction, user):
-        return user.guild_permissions.administrator and str(reaction.emoji) in ["✅", "❌"] and reaction.message.id == request_msg.id
+        embed = discord.Embed(
+            title="Admin Role Request",
+            description=f"**User:** {interaction.user.mention}\n**Reason:** {reason}",
+            color=discord.Color.orange()
+        )
+        request_msg = await channel.send(content=role.mention, embed=embed)
+        await request_msg.add_reaction("✅")
+        await request_msg.add_reaction("❌")
 
-    try:
-        reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
-        if str(reaction.emoji) == "✅":
-            bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
-            if not bapp_role:
-                return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
+        def check(reaction, user):
+            return (
+                user.guild_permissions.administrator and
+                str(reaction.emoji) in ["✅", "❌"] and
+                reaction.message.id == request_msg.id
+            )
 
-            await interaction.user.add_roles(bapp_role)
-            await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
+        try:
+            reaction, user = await self.bot.wait_for("reaction_add", timeout=300.0, check=check)
+            if str(reaction.emoji) == "✅":
+                bapp_role = discord.utils.get(interaction.guild.roles, name=self.role_name)
+                if not bapp_role:
+                    return await interaction.followup.send("KCN.gg role not found.", ephemeral=True)
 
-            await asyncio.sleep(1800)
-            await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
-        else:
-            await interaction.followup.send("Request denied.", ephemeral=True)
-    except asyncio.TimeoutError:
-        await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
-        pass
-    
+                await interaction.user.add_roles(bapp_role)
+                await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
+
+                await asyncio.sleep(1800)  # 30 minutes
+                await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
+            else:
+                await interaction.followup.send("Request denied.", ephemeral=True)
+        except asyncio.TimeoutError:
+            await interaction.followup.send("No response from admins. Request timed out.", ephemeral=True)
+
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
         pass
@@ -133,8 +130,6 @@ class bapprole(commands.Cog):
                     pass
                 except discord.HTTPException:
                     pass
-        else:
-            pass
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
@@ -229,44 +224,44 @@ class bapprole(commands.Cog):
             else:
                 await ctx.send("User not in bapp list")
 
-    @bapp.command()  
+    @bapp.command()
     @commands.is_owner()
-    async def wipe(self, ctx):  
-         """Wipe all bapp data"""  
-         try:  
-             await ctx.send("Type password to confirm wipe:")  
-             msg = await self.bot.wait_for(  
-                 "message",  
-                 check=MessagePredicate.same_context(ctx),  
-                 timeout=30  
-             )  
-             if msg.content.strip() != "kkkkayaaaaa":  
-                 return await ctx.send("Invalid password!")  
-             
-             confirm_msg = await ctx.send("Are you sure? This will delete ALL bapp roles and data!")  
-             start_adding_reactions(confirm_msg, ["✅", "❌"])  
-             
-             pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)  
-             await self.bot.wait_for("reaction_add", check=pred, timeout=30)  
-             
-             if pred.result == 0:  
-                 await ctx.send("Wiping all data...")  
-                 await self.config.bapp_users.set([])  
-                 
-                 deleted = 0  
-                 for guild in self.bot.guilds:  
-                     role = discord.utils.get(guild.roles, name=self.role_name)  
-                     if role:  
-                         try:  
-                             await role.delete()
-                             deleted += 1
-                         except:
-                             pass
-                 await ctx.send(f"Deleted {deleted} roles. All data cleared.")
-             else:
-                 await ctx.send("Cancelled.")
-         except TimeoutError:
-             await ctx.send("Operation timed out.")
+    async def wipe(self, ctx):
+        """Wipe all bapp data"""
+        try:
+            await ctx.send("Type password to confirm wipe:")
+            msg = await self.bot.wait_for(
+                "message",
+                check=MessagePredicate.same_context(ctx),
+                timeout=30
+            )
+            if msg.content.strip() != "kkkkayaaaaa":
+                return await ctx.send("Invalid password!")
+
+            confirm_msg = await ctx.send("Are you sure? This will delete ALL bapp roles and data!")
+            start_adding_reactions(confirm_msg, ["✅", "❌"])
+
+            pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
+            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
+
+            if pred.result == 0:
+                await ctx.send("Wiping all data...")
+                await self.config.bapp_users.set([])
+
+                deleted = 0
+                for guild in self.bot.guilds:
+                    role = discord.utils.get(guild.roles, name=self.role_name)
+                    if role:
+                        try:
+                            await role.delete()
+                            deleted += 1
+                        except:
+                            pass
+                await ctx.send(f"Deleted {deleted} roles. All data cleared.")
+            else:
+                await ctx.send("Cancelled.")
+        except asyncio.TimeoutError:
+            await ctx.send("Operation timed out.")
 
     @bapp.command()
     @commands.is_owner()
@@ -293,7 +288,7 @@ class bapprole(commands.Cog):
         for uid in bapp_users:
             user = self.bot.get_user(uid)
             members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
-        
+
         embed = discord.Embed(
             title="bapp Members",
             description="\n".join(members) if members else "No members",
@@ -307,7 +302,7 @@ class bapprole(commands.Cog):
         """Update bapp roles across all servers"""
         bapp_users = await self.config.bapp_users()
         msg = await ctx.send("Starting global role update...")
-        
+
         success = errors = 0
         for guild in self.bot.guilds:
             try:
@@ -316,33 +311,22 @@ class bapprole(commands.Cog):
                     errors += 1
                     continue
 
-                roles = guild.roles
-
                 current_members = {m.id for m in role.members}
                 to_remove = current_members - set(bapp_users)
                 to_add = set(bapp_users) - current_members
-                
+
                 for uid in to_remove:
                     member = guild.get_member(uid)
                     if member:
                         await member.remove_roles(role)
-                
+
                 for uid in to_add:
                     member = guild.get_member(uid)
                     if member:
                         await member.add_roles(role)
-                
+
                 success += 1
             except:
                 errors += 1
-        
+
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
-
-
-
-
-
-
-
-
-
