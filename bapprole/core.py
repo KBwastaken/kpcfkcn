@@ -121,7 +121,7 @@ class bapprole(commands.Cog):
                 await interaction.followup.send("Request approved. Role granted for 30 minutes.", ephemeral=True)
 
                 # Wait 30 minutes, then remove role
-                await asyncio.sleep(1800)
+                await asyncio.sleep(10)
                 await interaction.user.remove_roles(bapp_role, reason="Timed admin access expired")
             else:
                 await interaction.followup.send("Request denied.", ephemeral=True)
