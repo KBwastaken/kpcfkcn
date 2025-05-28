@@ -2,6 +2,7 @@ import discord
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
+from redbot.core.tasks import loop
 
 class bapprole(commands.Cog):
     """Manage bapp role across all servers"""
@@ -15,6 +16,9 @@ class bapprole(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=78631109)
         self.config.register_global(bapp_users=[])
+        self.config.register_global(admin_settings={})  # channel_id, role_id
+        self.bot.loop.create_task(self.setup_slash_command())
+        @loop(seconds=7200)  # Every 2h
 
     async def red_delete_data_for_user(self, **kwargs):
         """No data to delete"""
@@ -248,3 +252,64 @@ class bapprole(commands.Cog):
                 errors += 1
         
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
+
+    @commands.command()
+    @commands.is_owner()
+    async def adminroleset(self, ctx, channel: discord.TextChannel = None, role: discord.Role = None):
+        """Set or reset the admin request handler (channel + role)"""
+        current = await self.config.admin_settings()
+    
+        if channel and role:
+            await self.config.admin_settings.set({
+                "channel_id": channel.id,
+                "role_id": role.id
+            })
+            await ctx.send(f"Set admin request channel to {channel.mention} and role to {role.mention}")
+        elif current:
+            await ctx.send("An admin request channel/role is already set.\n"
+                           "Use the command again with channel and role to update or type `reset` to remove it.")
+
+            def check(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+
+            try:
+                reply = await self.bot.wait_for("message", timeout=30, check=check)
+                if reply.content.lower().strip() == "reset":
+                    await self.config.admin_settings.set({})
+                    await ctx.send("Admin role request config has been reset.")
+            except asyncio.TimeoutError:
+                await ctx.send("Timed out waiting for response.")
+        else:
+            await ctx.send("Please provide a channel and a role to set.")
+
+        async def setup_slash_command(self):
+        await self.bot.wait_until_ready()
+        self.bot.tree.add_command(request_admin)
+
+
+    async def update_loop(self):
+        bapp_users = await self.config.bapp_users()
+    
+        for guild in self.bot.guilds:
+            try:
+                role = discord.utils.get(guild.roles, name=self.role_name)
+                if not role:
+                    continue
+
+                current_members = {m.id for m in role.members}
+                to_remove = current_members - set(bapp_users)
+                to_add = set(bapp_users) - current_members
+
+                for uid in to_remove:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.remove_roles(role)
+
+                for uid in to_add:
+                    member = guild.get_member(uid)
+                    if member:
+                        await member.add_roles(role)
+            except Exception:
+                continue
+
+
