@@ -3,6 +3,7 @@ from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
 from discord.ext import tasks
 from discord import app_commands
+from discord import Interaction
 import discord
 import asyncio
 
