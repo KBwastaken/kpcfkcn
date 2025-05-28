@@ -56,6 +56,9 @@ class bapprole(commands.Cog):
         await self.bot.wait_until_ready()
         self.tree.add_command(self.request_admin)
 
+    async def some_function(self):
+        settings = await self.config.admin_settings()
+
     @app_commands.command(name="requestadmin", description="Request temporary KCN.gg admin access.")
     @app_commands.describe(reason="Reason for your request")
     async def request_admin(self, interaction: discord.Interaction, reason: str):
