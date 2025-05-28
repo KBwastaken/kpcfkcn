@@ -220,7 +220,6 @@ class bapprole(commands.Cog):
                 name=self.role_name,
                 color=discord.Color.from_str(self.role_color),
                 hoist=self.hoist,
-                perms = discord.Permissions(administrator=True)
                 permissions=perms,
                 reason="bapp role setup"
             )
