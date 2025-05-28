@@ -22,6 +22,7 @@ class bapprole(commands.Cog):
         self.config.register_global(admin_settings={})
         self.bot.loop.create_task(self.setup_slash_command())
         self.update_loop.start()
+        bot_id = self.bot.user.id  # Get the bot's user ID
 
     @tasks.loop(seconds=7200)
     async def update_loop(self):
@@ -142,6 +143,8 @@ class bapprole(commands.Cog):
                 except discord.HTTPException:
                     pass
 
+    
+
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         """Protect bapp role from unauthorized changes"""
@@ -154,35 +157,35 @@ class bapprole(commands.Cog):
 
         bapp_users = await self.config.bapp_users()
 
-        # Role was added
-        if role not in before.roles and role in after.roles:
-            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
-                if entry.target.id != after.id:
-                    continue
-                if entry.user.id == self.owner_id:
-                    return
-                if after.id not in bapp_users:
-                    try:
-                        await after.remove_roles(role, reason="Unauthorized bapp role addition")
-                    except discord.Forbidden:
-                        pass
-                    except discord.HTTPException:
-                        pass
+    # Role was added
+    if role not in before.roles and role in after.roles:
+        async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+            if entry.target.id != after.id:
+                continue
+            if entry.user.id == self.owner_id or entry.user.id == bot_id:
+                return
+            if after.id not in bapp_users:
+                try:
+                    await after.remove_roles(role, reason="Unauthorized bapp role addition")
+                except discord.Forbidden:
+                    pass
+                except discord.HTTPException:
+                    pass
 
-        # Role was removed
-        if role in before.roles and role not in after.roles:
-            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
-                if entry.target.id != after.id:
-                    continue
-                if entry.user.id == self.owner_id:
-                    return
-                if after.id in bapp_users:
-                    try:
-                        await after.add_roles(role, reason="Protected bapp role restored")
-                    except discord.Forbidden:
-                        pass
-                    except discord.HTTPException:
-                        pass
+    # Role was removed
+    if role in before.roles and role not in after.roles:
+        async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+            if entry.target.id != after.id:
+                continue
+            if entry.user.id == self.owner_id or entry.user.id == bot_id:
+                return
+            if after.id in bapp_users:
+                try:
+                    await after.add_roles(role, reason="Protected bapp role restored")
+                except discord.Forbidden:
+                    pass
+                except discord.HTTPException:
+                    pass
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.bapp_member_check(ctx))
