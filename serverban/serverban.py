@@ -347,7 +347,7 @@ class ServerBan(red_commands.Cog):
 
 @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
 @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
-async def globalbanlist(self, interaction: Interaction, ephemeral: Optional[bool] = True):
+async def globalbanlist(self, interaction, ephemeral: Optional[bool] = True):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(
             embed=self._error_embed("You are not authorized to use this command."),
@@ -362,7 +362,7 @@ async def globalbanlist(self, interaction: Interaction, ephemeral: Optional[bool
 
     lines = [f"<@{user_id}> `{user_id}`" for user_id in self.global_ban_list]
 
-    chunk_size = 1900  # leave margin for embed formatting
+    chunk_size = 1900
     description_chunks = []
     current_chunk = ""
     for line in lines:
