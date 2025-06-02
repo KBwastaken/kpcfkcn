@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from redbot.core import commands as red_commands
 from redbot.core.bot import Red
+from typing import Optional
 import json
 import os
 
@@ -250,7 +251,7 @@ from typing import Optional
 @app_commands.checks.has_permissions(ban_members=True)
 async def massglobalban(
     self,
-    interaction,
+    interaction: discord.Interaction,
     user1: str,
     reason: str,
     user2: Optional[str] = None,
