@@ -22,7 +22,7 @@ class ServerKick(red_commands.Cog):
         return discord.Embed(title="✅ Success", description=message, color=discord.Color.green())
 
     def _action_embed(self, user: discord.User, action: str, reason: str, moderator: discord.User, is_global: bool) -> discord.Embed:
-        title = "Global Kick" if action == "kick" and is_global else action.capitalize()
+        title = "Global Kick" if is_global else "Kick"
         description = f"{user.mention} has been {'globally ' if is_global else ''}{action}ed for: {reason}"
         embed = discord.Embed(
             title=title,
@@ -30,7 +30,7 @@ class ServerKick(red_commands.Cog):
             color=discord.Color.orange()
         )
         embed.set_footer(text=f"Command requested by {moderator.name}")
-        embed.set_thumbnail(url=KICK_GIF if action == "kick")
+        embed.set_thumbnail(url=KICK_GIF if action == "kick" else None)
         return embed
 
     @commands.Cog.listener()
@@ -42,7 +42,10 @@ class ServerKick(red_commands.Cog):
 
     @app_commands.command(name="skick", description="Kick a user by ID (globally or in this server).")
     @app_commands.describe(user_id="User ID to kick", reason="Reason for kicking", is_global="Kick in all servers?")
-    @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
+    @app_commands.choices(is_global=[
+        app_commands.Choice(name="No", value="no"),
+        app_commands.Choice(name="Yes", value="yes")
+    ])
     @app_commands.checks.has_permissions(kick_members=True)
     async def skick(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
         try:
