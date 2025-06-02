@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from redbot.core import commands as red_commands
+from discord import Interaction
 from redbot.core.bot import Red
 from typing import Optional
 import json
