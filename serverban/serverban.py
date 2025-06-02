@@ -252,7 +252,7 @@ from typing import Optional
 @app_commands.checks.has_permissions(ban_members=True)
 async def massglobalban(
     self,
-    interaction: discord.Interaction,
+    interaction: Interaction,
     user1: str,
     reason: str,
     user2: Optional[str] = None,
