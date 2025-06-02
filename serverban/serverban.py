@@ -346,7 +346,8 @@ class ServerBan(red_commands.Cog):
         )
 
     @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
-    async def globalbanlist(self, interaction: Interaction):
+    @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
+    async def globalbanlist(self, interaction: Interaction, ephemeral: Optional[bool] = True):
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(
                 embed=self._error_embed("You are not authorized to use this command."),
@@ -386,8 +387,7 @@ class ServerBan(red_commands.Cog):
         if current_chunk:
             description_chunks.append(current_chunk)
 
-        # Send one or multiple embeds if too long
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=ephemeral)
 
         for i, desc in enumerate(description_chunks):
             embed = discord.Embed(
@@ -396,6 +396,7 @@ class ServerBan(red_commands.Cog):
                 color=discord.Color.orange()
             )
             if i == 0:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await interaction.followup.send(embed=embed, ephemeral=ephemeral)
             else:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await interaction.followup.send(embed=embed, ephemeral=ephemeral)
+
