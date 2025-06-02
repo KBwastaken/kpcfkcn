@@ -3,19 +3,33 @@ from discord import app_commands
 from discord.ext import commands
 from redbot.core import commands as red_commands
 from redbot.core.bot import Red
+import json
+import os
 
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 BAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361786454862201075/c00kie-get-banned.gif"
 UNBAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361789020593455456/unban-fivem.gif"
+BANLIST_FILE = "global_ban_list.json"
 
 class ServerBan(red_commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
         self.tree = bot.tree
-        self.blacklisted_users = {}  # user_id: {reason, added_by}
+        self.blacklisted_users = {}
         self.server_blacklist = {1298444715804327967}
-        self.global_ban_list = set()
+        self._load_global_bans()
+
+    def _load_global_bans(self):
+        if os.path.exists(BANLIST_FILE):
+            with open(BANLIST_FILE, "r") as f:
+                self.global_ban_list = set(json.load(f))
+        else:
+            self.global_ban_list = set()
+
+    def _save_global_bans(self):
+        with open(BANLIST_FILE, "w") as f:
+            json.dump(list(self.global_ban_list), f)
 
     def _error_embed(self, message: str) -> discord.Embed:
         return discord.Embed(title="❌ Error", description=message, color=discord.Color.red())
@@ -118,6 +132,7 @@ class ServerBan(red_commands.Cog):
 
         if is_global:
             self.global_ban_list.add(user_id)
+            self._save_global_bans()
 
         await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
         await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global))
@@ -137,7 +152,6 @@ class ServerBan(red_commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        # Do Not Unban check
         if user_id in self.blacklisted_users:
             info = self.blacklisted_users[user_id]
             embed = discord.Embed(
@@ -172,22 +186,19 @@ class ServerBan(red_commands.Cog):
 
         if is_global:
             self.global_ban_list.discard(user_id)
+            self._save_global_bans()
 
-        # Send result summary
         await interaction.followup.send(embed=discord.Embed(
             title="Unban Results",
             description="\n".join(results),
             color=discord.Color.orange()
         ))
 
-        # Post action log embed to the channel (just like in sban)
         try:
             await interaction.channel.send(embed=self._action_embed(user, "unban", reason, moderator, is_global))
         except Exception:
             pass
 
-        
-        
     @app_commands.command(name="bansync", description="Sync all globally banned users to this server.")
     async def bansync(self, interaction: discord.Interaction):
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
@@ -223,6 +234,4 @@ class ServerBan(red_commands.Cog):
         try:
             await interaction.followup.send(embed=embed)
         except discord.NotFound:
-            # Fallback if interaction expired
             await interaction.channel.send(embed=embed)
-
