@@ -19,7 +19,7 @@ class ServerBan(red_commands.Cog):
         self.bot = bot
         self.tree = bot.tree
         self.blacklisted_users = {}
-        self.server_blacklist = {1368969894242291742}
+        self.server_blacklist = {1368969894242291742, 1298444715804327967}
         self._load_global_bans()
 
     def _load_global_bans(self):
