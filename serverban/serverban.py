@@ -345,58 +345,40 @@ class ServerBan(red_commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
-    @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
-    async def globalbanlist(self, interaction: Interaction, ephemeral: Optional[bool] = True):
-        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(
-                embed=self._error_embed("You are not authorized to use this command."),
-                ephemeral=True
-            )
+@app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
+@app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
+async def globalbanlist(self, interaction: Interaction, ephemeral: Optional[bool] = True):
+    if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+        return await interaction.response.send_message(
+            embed=self._error_embed("You are not authorized to use this command."),
+            ephemeral=True
+        )
 
-        if not self.global_ban_list:
-            return await interaction.response.send_message(
-                embed=self._success_embed("The global ban list is currently empty."),
-                ephemeral=True
-            )
+    if not self.global_ban_list:
+        return await interaction.response.send_message(
+            embed=self._success_embed("The global ban list is currently empty."),
+            ephemeral=True
+        )
 
-        # Build list of banned users info
-        lines = []
-        for user_id in self.global_ban_list:
-            mention = f"<@{user_id}>"
-            reason = "No reason recorded"
-            banned_by = "Unknown"
+    lines = [f"<@{user_id}> `{user_id}`" for user_id in self.global_ban_list]
 
-            # Check if user is in blacklisted_users for reason and banned_by info
-            info = self.blacklisted_users.get(user_id)
-            if info:
-                reason = info.get("reason", reason)
-                banned_by = info.get("added_by", banned_by)
-
-            lines.append(f"{mention} `{user_id}`\nReason: {reason}\nBanned by: {banned_by}\n")
-
-        # Discord embeds have a max description length; split if needed
-        chunk_size = 1900  # leave some margin for embed formatting
-        description_chunks = []
-        current_chunk = ""
-        for line in lines:
-            if len(current_chunk) + len(line) > chunk_size:
-                description_chunks.append(current_chunk)
-                current_chunk = ""
-            current_chunk += line + "\n"
-        if current_chunk:
+    chunk_size = 1900  # leave margin for embed formatting
+    description_chunks = []
+    current_chunk = ""
+    for line in lines:
+        if len(current_chunk) + len(line) + 1 > chunk_size:
             description_chunks.append(current_chunk)
+            current_chunk = ""
+        current_chunk += line + "\n"
+    if current_chunk:
+        description_chunks.append(current_chunk)
 
-        await interaction.response.defer(ephemeral=ephemeral)
+    await interaction.response.defer(ephemeral=ephemeral)
 
-        for i, desc in enumerate(description_chunks):
-            embed = discord.Embed(
-                title=f"Global Ban List{' (Part '+str(i+1)+')' if len(description_chunks) > 1 else ''}",
-                description=desc,
-                color=discord.Color.orange()
-            )
-            if i == 0:
-                await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-            else:
-                await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-
+    for i, desc in enumerate(description_chunks):
+        embed = discord.Embed(
+            title=f"Global Ban List{' (Part '+str(i+1)+')' if len(description_chunks) > 1 else ''}",
+            description=desc,
+            color=discord.Color.orange()
+        )
+        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
