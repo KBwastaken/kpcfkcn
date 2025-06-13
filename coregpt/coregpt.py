@@ -3,32 +3,31 @@ from redbot.core import commands, checks, Config
 import aiohttp
 
 class CoreGPT(commands.Cog):
-    """ChatGPT integration for Core with conversation memory."""
+    """Hugging Face integration for Core with conversation memory."""
 
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=123456789)
         default_global = {
-            "api_key": ""
+            "hf_token": ""
         }
         self.config.register_global(**default_global)
-        # Store chat history per user
         self.histories = {}
 
     @commands.is_owner()
     @commands.command()
     async def gptstatus(self, ctx):
         """Check if everything is set up correctly."""
-        api_key = await self.config.api_key()
-        status = "✅ API key set." if api_key else "❌ API key missing."
+        hf_token = await self.config.hf_token()
+        status = "✅ HF token set." if hf_token else "❌ HF token missing."
         await ctx.send(f"CoreGPT status:\n{status}")
 
     @commands.is_owner()
     @commands.command()
-    async def setgptkey(self, ctx, api_key: str):
-        """Set your OpenAI API key."""
-        await self.config.api_key.set(api_key)
-        await ctx.send("API key saved.")
+    async def sethftoken(self, ctx, hf_token: str):
+        """Set your Hugging Face token."""
+        await self.config.hf_token.set(hf_token)
+        await ctx.send("Hugging Face token saved.")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -38,7 +37,6 @@ class CoreGPT(commands.Cog):
         prefixes = ["hey core", "hi core"]
         content = message.content.lower()
 
-        # If it's a new convo with prefix
         if any(content.startswith(p) for p in prefixes):
             user_input = message.content.split(maxsplit=2)
             if len(user_input) < 3:
@@ -48,37 +46,36 @@ class CoreGPT(commands.Cog):
             prompt = message.content[len(user_input[0]) + 1:]
             await self.handle_gpt(message, prompt)
 
-        # If it's a reply to the bot
         elif message.reference:
             try:
                 ref_msg = await message.channel.fetch_message(message.reference.message_id)
                 if ref_msg.author.id == self.bot.user.id:
                     await self.handle_gpt(message, message.content)
             except Exception:
-                pass  # fail silently
+                pass
 
     async def handle_gpt(self, message, user_input):
-        api_key = await self.config.api_key()
-        if not api_key:
-            await message.channel.send("API key not set. Ask the bot owner to use [p]setgptkey.")
+        hf_token = await self.config.hf_token()
+        if not hf_token:
+            await message.channel.send("Hugging Face token not set. Use [p]sethftoken.")
             return
 
         user_id = message.author.id
         history = self.histories.get(user_id, [])
-        history.append({"role": "user", "content": user_input})
+        history.append(user_input)
 
-        # Keep last 10 messages to limit context size
-        history = history[-10:]
+        # Keep last 5 lines to limit prompt size
+        short_history = history[-5:]
+        prompt = "\n".join(short_history)
 
         async with aiohttp.ClientSession() as session:
-            url = "https://api.openai.com/v1/chat/completions"
+            url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
             headers = {
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {hf_token}",
                 "Content-Type": "application/json"
             }
             json_data = {
-                "model": "gpt-3.5-turbo",
-                "messages": [{"role": "system", "content": "You are a helpful assistant."}] + history
+                "inputs": prompt
             }
 
             async with session.post(url, headers=headers, json=json_data) as resp:
@@ -86,9 +83,7 @@ class CoreGPT(commands.Cog):
                     await message.channel.send(f"Error: {resp.status}")
                     return
                 data = await resp.json()
-                reply = data["choices"][0]["message"]["content"]
-
-                history.append({"role": "assistant", "content": reply})
-                self.histories[user_id] = history  # Save updated history
-
+                reply = data[0]["generated_text"].split(prompt, 1)[-1].strip()
+                history.append(reply)
+                self.histories[user_id] = history
                 await message.channel.send(reply)
