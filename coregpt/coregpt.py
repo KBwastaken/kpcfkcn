@@ -8,7 +8,7 @@ class CoreGPT(commands.Cog):
         self.bot = bot
         self.api_base_url = "http://127.0.0.1:52653"
         self.generate_endpoint = f"{self.api_base_url}/api/generate"
-        self.api_key = "YOUR_SECRET_TOKEN"  # Put your actual key here
+        self.api_key = "YOUR_SECRET_TOKEN"  # Replace with your actual key
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
@@ -27,7 +27,8 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            user_input = message.content.split(maxsplit=1)[1] if len(message.content.split()) > 1 else ""
+            parts = message.content.split(maxsplit=1)
+            user_input = parts[1] if len(parts) > 1 else ""
             if not user_input:
                 await message.channel.send("Yes? How can I help?")
                 return
@@ -46,13 +47,15 @@ class CoreGPT(commands.Cog):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
-{
-  "inputs": "your prompt here",
-  "parameters": {
-    "max_new_tokens": 150,
-    "temperature": 0.7
-  }
-}
+        }
+
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 150,
+                "temperature": 0.7
+            }
+        }
 
         try:
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
