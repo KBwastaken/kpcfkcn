@@ -33,9 +33,10 @@ class CoreGPT(commands.Cog):
         else:
             await ctx.send("No Together AI API key found. Use `.gptsetkey` to set it.")
 
-    @commands.command()
-    @commands.guild_only()
-    @commands.admin_or_permissions(manage_channels=True)
+@commands.command()
+@commands.guild_only()
+@commands.has_permissions(manage_channels=True)
+async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
     async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
         """Set the category for private GPT channels in this server."""
         if not category:
