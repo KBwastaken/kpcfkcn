@@ -2,14 +2,13 @@ import discord
 from redbot.core import commands, checks
 import aiohttp
 import asyncio
-import json
 
 class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.api_base_url = "http://127.0.0.1:52653"
         self.generate_endpoint = f"{self.api_base_url}/api/generate"
-        self.api_key = "YOUR_SECRET_TOKEN"  # Replace with your real key
+        self.api_key = "YOUR_SECRET_TOKEN"  # Replace with your actual key
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
@@ -51,13 +50,15 @@ class CoreGPT(commands.Cog):
         }
 
         payload = {
-            "data": {  # <-- Wrap inputs and parameters inside "data"
-                "inputs": [prompt],
-                "parameters": {
-                    "max_new_tokens": 150,
-                    "temperature": 0.7
+            "data": [
+                {
+                    "inputs": [prompt],
+                    "parameters": {
+                        "max_new_tokens": 150,
+                        "temperature": 0.7
+                    }
                 }
-            }
+            ]
         }
 
         try:
