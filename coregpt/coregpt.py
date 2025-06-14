@@ -42,18 +42,27 @@ class CoreGPT(commands.Cog):
                 history.append({"role": "user", "content": user_input})
                 await self.handle_gpt_response(message, user_input, history=history)
 
-    async def handle_gpt_response(self, message, prompt, history=None):
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "inputs": [prompt],
-            "parameters": {
-                "max_new_tokens": 150,
-                "temperature": 0.7
-            }
-        }
+    async def handle_gpt_response(self, message, prompt):
+    headers = {
+        "Authorization": f"Bearer {self.api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+    "inputs": [prompt],  # wrap prompt in a list
+    "parameters": {
+        "max_new_tokens": 150,
+        "temperature": 0.7
+    }
+}
+
+
+    async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
+        if resp.status != 200:
+            await message.channel.send(f"Error from AI server: {resp.status}")
+            return
+        data = await resp.json()
+        text = data.get("text") or data.get("generated_text")
+        await message.channel.send(text.strip())
 
         try:
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
