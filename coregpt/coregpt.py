@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 
 async def test_post():
-    url = "http://localhost:5000/generate"  # try adjusting this if needed
+    url = "http://localhost:5000/generate"  # try your suspected endpoint here
     payload = {"prompt": "Say hi", "max_tokens": 20}
 
     async with aiohttp.ClientSession() as session:
