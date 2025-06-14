@@ -46,15 +46,13 @@ class CoreGPT(commands.Cog):
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
-        }
-
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 150,
-                "temperature": 0.7
-            }
-        }
+{
+  "inputs": "your prompt here",
+  "parameters": {
+    "max_new_tokens": 150,
+    "temperature": 0.7
+  }
+}
 
         try:
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
