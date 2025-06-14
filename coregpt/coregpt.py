@@ -1,6 +1,5 @@
-import openai
+from openai import OpenAI
 from redbot.core import commands, Config
-import discord
 
 class CoreGPT(commands.Cog):
     """A ChatGPT Cog for Red"""
@@ -8,18 +7,26 @@ class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=9876543210)
-        default_global = {"api_key": "", "model": "gpt-3.5-turbo"}
+        default_global = {"api_key": "", "model": "gpt-4o"}
         self.config.register_global(**default_global)
+        self.client = None
+
+    async def get_client(self):
+        if not self.client:
+            api_key = await self.config.api_key()
+            self.client = OpenAI(api_key=api_key)
+        return self.client
 
     @commands.command()
     async def gptsetkey(self, ctx, key: str):
         """Set your OpenAI API key"""
         await self.config.api_key.set(key)
-        await ctx.send("✅ API key has been set.")
+        self.client = None
+        await ctx.send("✅ API key set!")
 
     @commands.command()
     async def gptstatus(self, ctx):
-        """Show GPT configuration"""
+        """Show GPT status"""
         api_key = await self.config.api_key()
         model = await self.config.model()
         if api_key:
@@ -36,7 +43,6 @@ class CoreGPT(commands.Cog):
             return
 
         content = message.content.lower()
-
         if content.startswith("hey core") or content.startswith("hi core"):
             api_key = await self.config.api_key()
             if not api_key:
@@ -50,11 +56,10 @@ class CoreGPT(commands.Cog):
 
             prompt = message.content[len(user_input[0]) :].strip()
 
-            openai.api_key = api_key
-
             try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
+                client = await self.get_client()
+                response = client.chat.completions.create(
+                    model="gpt-4o",
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant."},
                         {"role": "user", "content": prompt}
