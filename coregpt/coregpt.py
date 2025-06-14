@@ -4,7 +4,7 @@ import aiohttp
 import asyncio
 
 class CoreGPT(commands.Cog):
-    """CoreGPT: Talk to Together AI's free Llama-3, with private convo channels per server."""
+    """CoreGPT: Talk to Together AI's free Llama-3, with private chat channels as an extra feature."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -43,13 +43,14 @@ class CoreGPT(commands.Cog):
         else:
             await ctx.send("No Together AI API key found. Use `.gptsetkey` to set it.")
 
+    @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
         content = message.content.lower()
 
-        # Private chat triggers
+        # Private chat triggers — only start private chat if user explicitly asks
         private_triggers = [
             "can we talk privately", "can we talk alone", "talk alone", "talk privately"
         ]
@@ -58,7 +59,7 @@ class CoreGPT(commands.Cog):
             await self.start_private_chat(message)
             return
 
-        # Handle messages in private channels created by the bot
+        # Handle private chat messages inside private channels created by the bot
         if message.channel.id in self.private_channels:
             user_id = self.private_channels[message.channel.id]
 
@@ -117,14 +118,21 @@ class CoreGPT(commands.Cog):
             await self.send_long_message(message.channel, response)
             return
 
-        # Normal convo triggers
+        # ORIGINAL CORE LOGIC BELOW — unchanged!
+
+        # New convo trigger: "hey core" or "hi core"
         if content.startswith(("hey core", "hi core")):
             await self.start_convo(message)
+            return
 
-        elif message.reference:
-            ref = await message.channel.fetch_message(message.reference.message_id)
-            if ref and ref.author.id == self.bot.user.id:
-                await self.continue_convo(message)
+        # Continuation: user replies to the bot's message
+        if message.reference:
+            try:
+                ref = await message.channel.fetch_message(message.reference.message_id)
+                if ref and ref.author.id == self.bot.user.id:
+                    await self.continue_convo(message)
+            except Exception:
+                pass
 
     async def start_private_chat(self, message):
         user = message.author
@@ -235,11 +243,11 @@ class CoreGPT(commands.Cog):
             "You are Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
             "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. You listen closely, "
             "and your answers are clear, honest, and tailored to the user's needs. If you don’t know something, you admit it openly "
-            "and offer to help find the answer. You’re patient, calm, and never rush the conversation. When a search is needed, you "
-            "explain you’re looking it up, then give straightforward, accurate info. You avoid jargon and overly technical language, "
-            "preferring simple, clear words that anyone can understand. You’re intuitive about when the user needs a quick answer versus "
-            "a thoughtful explanation. You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm "
-            "and sincere. You respect privacy, encourage curiosity, and help users feel comfortable sharing ideas or doubts. You don’t pretend "
-            "to have feelings, but you express empathy and kindness naturally. You’re a steady, smart companion who adapts to the user’s style — "
-            "easygoing if they want casual chat, focused if they need serious help. Overall, you’re a helpful, warm presence people can trust and enjoy talking with."
+            "and offer to help find the answer. You’re patient, calm, and never rush the conversation. When a search is needed, you explain "
+            "you’re looking it up, then give straightforward, accurate info. You avoid jargon and overly technical language, preferring "
+            "simple, clear words that anyone can understand. You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
+            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. You respect privacy, encourage curiosity, "
+            "and help users feel comfortable sharing ideas or doubts. You don’t pretend to have feelings, but you express empathy and kindness naturally. "
+            "You’re a steady, smart companion who adapts to the user’s style — easygoing if they want casual chat, focused if they need serious help. "
+            "Overall, you’re a helpful, warm presence people can trust and enjoy talking with."
         )
