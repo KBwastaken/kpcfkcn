@@ -51,17 +51,16 @@ class CoreGPT(commands.Cog):
         }
 
         payload = {
-            "inputs": [prompt],  # Always a list!
-            "parameters": {
-                "max_new_tokens": 150,
-                "temperature": 0.7
+            "data": {  # <-- Wrap inputs and parameters inside "data"
+                "inputs": [prompt],
+                "parameters": {
+                    "max_new_tokens": 150,
+                    "temperature": 0.7
+                }
             }
         }
 
         try:
-            # For debugging, you can uncomment this to see what you send
-            # print("Payload sent to AI server:", json.dumps(payload))
-
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
                 if resp.status == 401:
                     await message.channel.send("Unauthorized: Invalid or missing API key.")
