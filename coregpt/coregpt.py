@@ -290,17 +290,18 @@ class CoreGPT(commands.Cog):
         )
 
     async def together_chat(self, api_key, messages):
-        # Call Together AI API with given messages and key, return the assistant's response as string
-        url = "https://api.together.xyz/conversation"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        payload = {"model": "llama-3b-chat", "messages": messages}
+    url = "https://api.together.xyz/conversation"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {"model": "llama-3b-chat", "messages": messages}
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers) as resp:
-                if resp.status != 200:
-                    return "Sorry, I couldn't reach the AI service right now."
-                data = await resp.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=headers) as resp:
+            text = await resp.text()
+            if resp.status != 200:
+                print(f"Together AI API error {resp.status}: {text}")
+                return "Sorry, I couldn't reach the AI service right now."
+            data = await resp.json()
+            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
     async def send_long_message(self, channel, content):
         # Split long responses into chunks under Discord limit
