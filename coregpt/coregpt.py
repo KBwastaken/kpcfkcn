@@ -6,7 +6,7 @@ import asyncio
 class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.api_base_url = "http://localhost:5000/api/generate"
+        self.api_base_url = "http://localhost:5000/generate"
         self.generate_endpoint = f"{self.api_base_url}/api/v1/generate"
         self.session = None
         self.conversations = {}
