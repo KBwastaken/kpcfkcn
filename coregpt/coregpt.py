@@ -39,30 +39,14 @@ class CoreGPT(commands.Cog):
         await self.config.guild(ctx.guild).private_category.set(category.id)
         await ctx.send(f"Private chat category set to: {category.name}")
 
-    async def detect_distress(self, api_key, messages):
-        # Ask the AI if the user seems in emotional distress or crisis
-        if not api_key:
-            return False
-        check_messages = messages + [
-            {
-                "role": "system",
-                "content": (
-                    "Based on the conversation, does the user seem to be in emotional distress or crisis? "
-                    "Answer only with 'yes' or 'no'."
-                )
-            }
-        ]
-        response = await self.together_chat(api_key, check_messages)
-        return "yes" in response.lower()
-
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
+        content = message.content.lower()
         user = message.author
         guild = message.guild
-        content = message.content.lower()
 
         private_triggers = [
             "can we talk privately", "can we talk alone", "talk alone", "talk privately"
@@ -71,20 +55,11 @@ class CoreGPT(commands.Cog):
         # Check if this is a private chat channel
         if message.channel.id in self.private_channels:
             user_id = self.private_channels[message.channel.id]
-            key = await self.config.user(user).together_api_key()
 
-            if not key:
-                await message.channel.send("Please set your Together AI API key with `.gptsetkey` to chat here.")
-                return
-
-            # Prepare recent messages for distress detection
-            recent_msgs = self.chat_history.get(user_id, [{"role": "system", "content": self.system_prompt()}]) + [{"role": "user", "content": message.content}]
-
-            distress = await self.detect_distress(key, recent_msgs)
-
-            if distress:
+            # Comfort check for really bad shape phrase
+            if "really really really bad shape" in content:
                 await message.channel.send(
-                    f"{user.mention}, it looks like you might be struggling right now. "
+                    f"{user.mention}, it looks like you're struggling really bad right now. "
                     "Do you want me to ping a real human to assist you? Please reply with 'yes' or 'no'."
                 )
 
@@ -151,6 +126,11 @@ class CoreGPT(commands.Cog):
                     return
 
             # Normal private convo flow
+            key = await self.config.user(user).together_api_key()
+            if not key:
+                await message.channel.send("Please set your Together AI API key with `.gptsetkey` to chat here.")
+                return
+
             if user_id not in self.chat_history:
                 self.chat_history[user_id] = [
                     {"role": "system", "content": self.system_prompt()}
@@ -276,46 +256,46 @@ class CoreGPT(commands.Cog):
         self.chat_history[user_id].append({"role": "assistant", "content": response})
         await self.send_long_message(message.channel, response)
 
+    def system_prompt(self):
+        return (
+            "You are Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
+            "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. "
+            "You listen closely, and your answers are clear, honest, and tailored to the user's needs. "
+            "If you don’t know something, you admit it openly and offer to help find the answer. "
+            "You’re patient, calm, and never rush the conversation. "
+            "When a search is needed, you explain you’re looking it up, then give straightforward, accurate info. "
+            "You avoid jargon and overly technical language, preferring simple, clear words that anyone can understand. "
+            "You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
+            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. "
+            "You respect privacy, encourage curiosity, and help users feel comfortable sharing ideas or doubts. "
+            "You don’t pretend to have feelings, but you express empathy and kindness naturally. "
+            "You’re a steady, smart companion who adapts to the user’s style, easygoing if they want casual chat, focused if they need serious help. "
+            "Overall, you’re a helpful, warm presence people can trust and enjoy talking with."
+        )
+
     async def together_chat(self, api_key, messages):
-        if not api_key:
-            return "API key missing. Please set your Together AI API key first."
-        url = "https://api.together.xyz/conversation"
+        url = "https://api.together.xyz/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        payload = {
-            "model": "llama-3b-chat",
+        json_data = {
+            "model": "meta-llama/Llama-3-8b-chat-hf",
             "messages": messages
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers) as resp:
-                text = await resp.text()
-                if resp.status != 200:
-                    print(f"Together AI API error {resp.status}: {text}")
-                    return "Sorry, I couldn't reach the AI service right now."
-                data = await resp.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            async with session.post(url, headers=headers, json=json_data) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    return f"Error: {resp.status} - {await resp.text()}"
 
-    async def send_long_message(self, channel, message):
-        # Discord limits messages to 2000 chars
-        for chunk in [message[i:i+2000] for i in range(0, len(message), 2000)]:
-            await channel.send(chunk)
-
-    def system_prompt(self):
-        return (
-            "You are KCN Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
-            "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. You listen closely, "
-            "and your answers are clear, honest, and tailored to the user's needs. If you don’t know something, you admit it openly "
-            "and offer to help find the answer. You’re patient, calm, and never rush the conversation. When a search is needed, you explain "
-            "you’re looking it up, then give straightforward, accurate info. You avoid jargon and overly technical language, preferring "
-            "simple, clear words that anyone can understand. You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
-            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. You respect privacy, encourage curiosity, "
-            "and help users feel comfortable sharing ideas or doubts. You don’t pretend to have feelings, but you express empathy and kindness naturally. "
-            "You’re a steady, smart companion who adapts to the user’s style — easygoing if they want casual chat, focused if they need serious help. "
-            "Overall, you’re a helpful, warm presence people can trust and enjoy talking with."
-        )
-
-def setup(bot):
-    bot.add_cog(CoreGPT(bot))
+    async def send_long_message(self, channel, content):
+        limit = 1900
+        if len(content) <= limit:
+            await channel.send(content)
+        else:
+            for i in range(0, len(content), limit):
+                await channel.send(content[i:i+limit])
