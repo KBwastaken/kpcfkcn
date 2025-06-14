@@ -1,71 +1,64 @@
-from openai import OpenAI
+import discord
 from redbot.core import commands, Config
+import aiohttp
 
 class CoreGPT(commands.Cog):
-    """A ChatGPT Cog for Red"""
+    """CoreGPT: Talk to Together AI's free Llama-3."""
 
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=9876543210)
-        default_global = {"api_key": "", "model": "gpt-3.5-turbo"}
-        self.config.register_global(**default_global)
-        self.client = None
-
-    async def get_client(self):
-        if not self.client:
-            api_key = await self.config.api_key()
-            self.client = OpenAI(api_key=api_key)
-        return self.client
+        self.config = Config.get_conf(self, identifier=1234567890)
+        default_user = {"together_api_key": None}
+        self.config.register_user(**default_user)
 
     @commands.command()
-    async def gptsetkey(self, ctx, key: str):
-        """Set your OpenAI API key"""
-        await self.config.api_key.set(key)
-        self.client = None
-        await ctx.send("✅ API key set!")
+    async def gptsetkey(self, ctx, key):
+        """Set your Together AI API key."""
+        await self.config.user(ctx.author).together_api_key.set(key)
+        await ctx.send("Your Together AI API key has been saved.")
 
     @commands.command()
     async def gptstatus(self, ctx):
-        """Show GPT status"""
-        api_key = await self.config.api_key()
-        model = await self.config.model()
-        if api_key:
-            masked = api_key[:4] + "*" * (len(api_key) - 8) + api_key[-4:]
+        """Check your Together AI API key status."""
+        key = await self.config.user(ctx.author).together_api_key()
+        if key:
+            await ctx.send("Together AI API key is set.")
         else:
-            masked = "Not set"
-
-        msg = f"**API Key:** `{masked}`\n**Model:** `{model}`"
-        await ctx.send(msg)
+            await ctx.send("No Together AI API key found. Use `.gptsetkey` to set it.")
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
-        content = message.content.lower()
-        if content.startswith("hey core") or content.startswith("hi core"):
-            api_key = await self.config.api_key()
-            if not api_key:
-                await message.channel.send("API key not set. Use `.gptsetkey YOUR_API_KEY` first.")
+        if message.content.lower().startswith(("hey core", "hi core")):
+            key = await self.config.user(message.author).together_api_key()
+            if not key:
+                await message.channel.send("Please set your Together AI API key using `.gptsetkey` first.")
                 return
 
-            user_input = message.content.split(maxsplit=2)
-            if len(user_input) < 2:
-                await message.channel.send("Please say something after `hey core` or `hi core`.")
-                return
+            prompt = message.content
+            response = await self.together_chat(key, prompt)
+            await message.channel.send(response)
 
-            prompt = message.content[len(user_input[0]) :].strip()
+    async def together_chat(self, api_key, prompt):
+        url = "https://api.together.xyz/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        json_data = {
+            "model": "meta-llama/Llama-3-8b-chat-hf",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ]
+        }
 
-            try:
-                client = await self.get_client()
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                answer = response.choices[0].message.content
-                await message.channel.send(answer)
-            except Exception as e:
-                await message.channel.send(f"Error: {e}")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=json_data) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    return f"Error: {resp.status} - {await resp.text()}"
