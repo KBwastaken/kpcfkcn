@@ -8,7 +8,7 @@ class CoreGPT(commands.Cog):
         self.bot = bot
         self.api_base_url = "http://127.0.0.1:52653"
         self.generate_endpoint = f"{self.api_base_url}/api/generate"
-        self.api_key = "YOUR_SECRET_TOKEN"  # Replace with your actual key
+        self.api_key = "YOUR_SECRET_TOKEN"  # Put your actual key here
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
@@ -27,8 +27,7 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            parts = message.content.split(maxsplit=2)
-            user_input = parts[2] if len(parts) > 2 else ""
+            user_input = message.content.split(maxsplit=1)[1] if len(message.content.split()) > 1 else ""
             if not user_input:
                 await message.channel.send("Yes? How can I help?")
                 return
@@ -49,24 +48,30 @@ class CoreGPT(commands.Cog):
             "Content-Type": "application/json"
         }
 
+        # Corrected payload with "data" as a list containing one dict
         payload = {
-            "data": {
-                "inputs": prompt
-            }
+            "data": [
+                {
+                    "inputs": prompt
+                }
+            ]
         }
 
         try:
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
+                if resp.status == 401:
+                    await message.channel.send("Unauthorized: Invalid or missing API key.")
+                    return
                 if resp.status != 200:
-                    error_text = await resp.text()
-                    await message.channel.send(f"AI server error {resp.status}: {error_text}")
+                    await message.channel.send(f"Oops, AI server returned error {resp.status}")
                     return
                 data = await resp.json()
-                text = (
-                    data.get("results", [{}])[0].get("text") or
-                    data.get("generated_text") or
-                    data.get("text")
-                )
+                # Adjust parsing based on your server's response structure
+                text = None
+                if "results" in data and isinstance(data["results"], list):
+                    text = data["results"][0].get("text")
+                elif "generated_text" in data:
+                    text = data["generated_text"]
                 if not text:
                     await message.channel.send("Hmm, I didn’t get a response from AI.")
                     return
