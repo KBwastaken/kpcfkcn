@@ -57,7 +57,7 @@ class CoreGPT(commands.Cog):
 
         response = await self.together_chat(key, self.chat_history[user_id])
         self.chat_history[user_id].append({"role": "assistant", "content": response})
-        await message.channel.send(response)
+        await self.send_long_message(message.channel, response)
 
     async def continue_convo(self, message):
         key = await self.config.user(message.author).together_api_key()
@@ -74,7 +74,7 @@ class CoreGPT(commands.Cog):
         self.chat_history[user_id].append({"role": "user", "content": message.content})
         response = await self.together_chat(key, self.chat_history[user_id])
         self.chat_history[user_id].append({"role": "assistant", "content": response})
-        await message.channel.send(response)
+        await self.send_long_message(message.channel, response)
 
     async def together_chat(self, api_key, messages):
         url = "https://api.together.xyz/v1/chat/completions"
@@ -94,3 +94,12 @@ class CoreGPT(commands.Cog):
                     return data["choices"][0]["message"]["content"]
                 else:
                     return f"Error: {resp.status} - {await resp.text()}"
+
+    async def send_long_message(self, channel, content):
+        # Discord's limit is 2000 but let's be safe and use 1900
+        limit = 1900
+        if len(content) <= limit:
+            await channel.send(content)
+        else:
+            for i in range(0, len(content), limit):
+                await channel.send(content[i:i+limit])
