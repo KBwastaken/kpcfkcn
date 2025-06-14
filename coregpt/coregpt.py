@@ -50,12 +50,29 @@ class CoreGPT(commands.Cog):
 
         content = message.content.lower()
 
-        # Private chat triggers — only start private chat if user explicitly asks
         private_triggers = [
             "can we talk privately", "can we talk alone", "talk alone", "talk privately"
         ]
 
-        if any(trigger in content for trigger in private_triggers):
+        is_private_trigger = False
+
+        # Check if message starts with "hey core" and contains a private trigger after that
+        if content.startswith("hey core"):
+            after_hey_core = content[7:].strip()  # everything after "hey core"
+            if any(trigger in after_hey_core for trigger in private_triggers):
+                is_private_trigger = True
+
+        # Or if message is a reply to any bot message and contains private trigger
+        elif message.reference:
+            try:
+                ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                if ref_msg.author.id == self.bot.user.id:
+                    if any(trigger in content for trigger in private_triggers):
+                        is_private_trigger = True
+            except Exception:
+                pass
+
+        if is_private_trigger:
             await self.start_private_chat(message)
             return
 
