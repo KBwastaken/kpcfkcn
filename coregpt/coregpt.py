@@ -2,13 +2,14 @@ import discord
 from redbot.core import commands, checks
 import aiohttp
 import asyncio
+import json
 
 class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.api_base_url = "http://127.0.0.1:52653"
         self.generate_endpoint = f"{self.api_base_url}/api/generate"
-        self.api_key = "YOUR_SECRET_TOKEN"  # Replace this with your real API key
+        self.api_key = "YOUR_SECRET_TOKEN"  # Replace with your real key
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
@@ -27,7 +28,8 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            user_input = message.content.split(maxsplit=1)[1] if len(message.content.split()) > 1 else ""
+            parts = message.content.split(maxsplit=1)
+            user_input = parts[1] if len(parts) > 1 else ""
             if not user_input:
                 await message.channel.send("Yes? How can I help?")
                 return
@@ -49,7 +51,7 @@ class CoreGPT(commands.Cog):
         }
 
         payload = {
-            "inputs": [prompt],
+            "inputs": [prompt],  # Always a list!
             "parameters": {
                 "max_new_tokens": 150,
                 "temperature": 0.7
@@ -57,9 +59,16 @@ class CoreGPT(commands.Cog):
         }
 
         try:
+            # For debugging, you can uncomment this to see what you send
+            # print("Payload sent to AI server:", json.dumps(payload))
+
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
                 if resp.status == 401:
                     await message.channel.send("Unauthorized: Invalid or missing API key.")
+                    return
+                if resp.status == 422:
+                    text = await resp.text()
+                    await message.channel.send(f"Invalid request (422): {text}")
                     return
                 if resp.status != 200:
                     await message.channel.send(f"Oops, AI server returned error {resp.status}")
