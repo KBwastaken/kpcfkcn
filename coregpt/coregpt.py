@@ -4,7 +4,7 @@ import aiohttp
 import asyncio
 
 class CoreGPT(commands.Cog):
-    """CoreGPT: Talk to Together AI's free Llama-3, with private chat channels as an extra feature."""
+    """CoreGPT: Talk to Together AI's free Llama-3, with convo threading, plus private chats."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -13,26 +13,14 @@ class CoreGPT(commands.Cog):
         default_guild = {"private_category": None}
         self.config.register_user(**default_user)
         self.config.register_guild(**default_guild)
-        self.chat_history = {}  # user_id -> list of messages
-        self.private_channels = {}  # channel_id -> user_id
+        self.chat_history = {}  # user_id: messages list for convo memory
+        self.private_channels = {}  # channel_id: user_id for private chats
 
     @commands.command()
     async def gptsetkey(self, ctx, key):
-        """Set your Together AI API key (global per user)."""
+        """Set your Together AI API key."""
         await self.config.user(ctx.author).together_api_key.set(key)
         await ctx.send("Your Together AI API key has been saved.")
-
-    @commands.command()
-    @commands.guild_only()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
-        """Set the category where private channels will be created for this server."""
-        if category is None:
-            await self.config.guild(ctx.guild).private_category.set(None)
-            await ctx.send("Private channel category unset for this server.")
-        else:
-            await self.config.guild(ctx.guild).private_category.set(category.id)
-            await ctx.send(f"Private channel category set to: {category.name}")
 
     @commands.command()
     async def gptstatus(self, ctx):
@@ -43,52 +31,73 @@ class CoreGPT(commands.Cog):
         else:
             await ctx.send("No Together AI API key found. Use `.gptsetkey` to set it.")
 
+    @commands.command()
+    @commands.guild_only()
+    @commands.admin()
+    async def gptsetcategory(self, ctx, category: discord.CategoryChannel):
+        """Set the category for private CoreGPT chats."""
+        await self.config.guild(ctx.guild).private_category.set(category.id)
+        await ctx.send(f"Private chat category set to: {category.name}")
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
         content = message.content.lower()
+        user = message.author
+        guild = message.guild
 
         private_triggers = [
             "can we talk privately", "can we talk alone", "talk alone", "talk privately"
         ]
 
-        is_private_trigger = False
-
-        # Check if message starts with "hey core" and contains a private trigger after that
-        if content.startswith("hey core"):
-            after_hey_core = content[7:].strip()  # everything after "hey core"
-            if any(trigger in after_hey_core for trigger in private_triggers):
-                is_private_trigger = True
-
-        # Or if message is a reply to any bot message and contains private trigger
-        elif message.reference:
-            try:
-                ref_msg = await message.channel.fetch_message(message.reference.message_id)
-                if ref_msg.author.id == self.bot.user.id:
-                    if any(trigger in content for trigger in private_triggers):
-                        is_private_trigger = True
-            except Exception:
-                pass
-
-        if is_private_trigger:
-            await self.start_private_chat(message)
-            return
-
-        # Handle private chat messages inside private channels created by the bot
+        # Check if this is a private chat channel
         if message.channel.id in self.private_channels:
             user_id = self.private_channels[message.channel.id]
 
-            # Ending conversation phrases
+            # Comfort check for really bad shape phrase
+            if "really really really bad shape" in content:
+                await message.channel.send(
+                    f"{user.mention}, it looks like you're struggling really bad right now. "
+                    "Do you want me to ping a real human to assist you? Please reply with 'yes' or 'no'."
+                )
+
+                def comfort_check(m):
+                    return (
+                        m.author.id == user_id and
+                        m.channel.id == message.channel.id and
+                        m.content.lower() in ["yes", "no"]
+                    )
+
+                try:
+                    reply = await self.bot.wait_for("message", check=comfort_check, timeout=60)
+                except asyncio.TimeoutError:
+                    await message.channel.send("No response received. I'm here if you want to talk more.")
+                    return
+
+                if reply.content.lower() == "yes":
+                    role = discord.utils.get(guild.roles, name="KCN | Team")
+                    if role:
+                        await message.channel.send(f"{role.mention}, {user.mention} needs assistance.")
+                        await message.channel.send("I've pinged the KCN | Team for you.")
+                    else:
+                        await message.channel.send(
+                            "Sorry, I couldn't find the 'KCN | Team' role to ping. Please reach out directly."
+                        )
+                else:
+                    await message.channel.send("Okay, I'm here to listen if you want to keep talking.")
+
+                return
+
+            # Check for ending conversation phrases
             end_phrases = [
                 "thank you that's all", "thank you thats all", "thank you, that's all",
                 "thank you", "that's all", "thanks"
             ]
-
-            if any(phrase in content for phrase in end_phrases) and message.author.id == user_id:
+            if any(phrase in content for phrase in end_phrases) and user.id == user_id:
                 confirm_msg = await message.channel.send(
-                    f"{message.author.mention} Are you sure you want to end our conversation? Please reply with 'yes' or 'no'."
+                    f"{user.mention} Are you sure you want to end our conversation? Please reply with 'yes' or 'no'."
                 )
 
                 def check(m):
@@ -116,8 +125,8 @@ class CoreGPT(commands.Cog):
                     await message.channel.send("Okay, continuing our chat.")
                     return
 
-            # Normal private channel convo
-            key = await self.config.user(message.author).together_api_key()
+            # Normal private convo flow
+            key = await self.config.user(user).together_api_key()
             if not key:
                 await message.channel.send("Please set your Together AI API key with `.gptsetkey` to chat here.")
                 return
@@ -135,14 +144,33 @@ class CoreGPT(commands.Cog):
             await self.send_long_message(message.channel, response)
             return
 
-        # ORIGINAL CORE LOGIC BELOW — unchanged!
+        # Check private chat triggers:
+        is_private_trigger = False
 
-        # New convo trigger: "hey core" or "hi core"
+        if content.startswith("hey core"):
+            after_hey_core = content[7:].strip()
+            if any(trigger in after_hey_core for trigger in private_triggers):
+                is_private_trigger = True
+
+        elif message.reference:
+            try:
+                ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                if ref_msg.author.id == self.bot.user.id:
+                    if any(trigger in content for trigger in private_triggers):
+                        is_private_trigger = True
+            except Exception:
+                pass
+
+        if is_private_trigger:
+            await self.start_private_chat(message)
+            return
+
+        # Original Core convo triggers:
+
         if content.startswith(("hey core", "hi core")):
             await self.start_convo(message)
             return
 
-        # Continuation: user replies to the bot's message
         if message.reference:
             try:
                 ref = await message.channel.fetch_message(message.reference.message_id)
@@ -165,7 +193,7 @@ class CoreGPT(commands.Cog):
             await message.channel.send("Configured private chat category not found on this server. Please contact kkkkayaaaaa.")
             return
 
-        # Check if user already has a private channel
+        # Check if user already has a private channel open
         for ch_id, u_id in self.private_channels.items():
             if u_id == user.id:
                 channel = guild.get_channel(ch_id)
@@ -175,7 +203,7 @@ class CoreGPT(commands.Cog):
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True, mention_everyone=False),
             self.bot.user: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
 
@@ -192,9 +220,9 @@ class CoreGPT(commands.Cog):
         ]
 
         await channel.send(
-            f"{user.mention}, this is your private chat with Core and Core's Trusted Team. To end the conversation, say 'thank you that's all' and I'll confirm before closing this channel and deleting it without any logs.."
+            f"{user.mention}, this is your private chat with Core. To end the conversation, say 'thank you that's all' and I'll confirm before closing this channel."
         )
-        await channel.send("Feel free to talk to me here anytime, no need to say 'hey core'. Just know anything you say is private and will never be shared!")
+        await channel.send("Feel free to talk to me here anytime, no need to say 'hey core'.")
 
     async def start_convo(self, message):
         key = await self.config.user(message.author).together_api_key()
@@ -228,6 +256,23 @@ class CoreGPT(commands.Cog):
         self.chat_history[user_id].append({"role": "assistant", "content": response})
         await self.send_long_message(message.channel, response)
 
+    def system_prompt(self):
+        return (
+            "You are Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
+            "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. "
+            "You listen closely, and your answers are clear, honest, and tailored to the user's needs. "
+            "If you don’t know something, you admit it openly and offer to help find the answer. "
+            "You’re patient, calm, and never rush the conversation. "
+            "When a search is needed, you explain you’re looking it up, then give straightforward, accurate info. "
+            "You avoid jargon and overly technical language, preferring simple, clear words that anyone can understand. "
+            "You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
+            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. "
+            "You respect privacy, encourage curiosity, and help users feel comfortable sharing ideas or doubts. "
+            "You don’t pretend to have feelings, but you express empathy and kindness naturally. "
+            "You’re a steady, smart companion who adapts to the user’s style, easygoing if they want casual chat, focused if they need serious help. "
+            "Overall, you’re a helpful, warm presence people can trust and enjoy talking with."
+        )
+
     async def together_chat(self, api_key, messages):
         url = "https://api.together.xyz/v1/chat/completions"
         headers = {
@@ -254,17 +299,3 @@ class CoreGPT(commands.Cog):
         else:
             for i in range(0, len(content), limit):
                 await channel.send(content[i:i+limit])
-
-    def system_prompt(self):
-        return (
-            "You are Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
-            "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. You listen closely, "
-            "and your answers are clear, honest, and tailored to the user's needs. If you don’t know something, you admit it openly "
-            "and offer to help find the answer. You’re patient, calm, and never rush the conversation. When a search is needed, you explain "
-            "you’re looking it up, then give straightforward, accurate info. You avoid jargon and overly technical language, preferring "
-            "simple, clear words that anyone can understand. You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
-            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. You respect privacy, encourage curiosity, "
-            "and help users feel comfortable sharing ideas or doubts. You don’t pretend to have feelings, but you express empathy and kindness naturally. "
-            "You’re a steady, smart companion who adapts to the user’s style — easygoing if they want casual chat, focused if they need serious help. "
-            "Overall, you’re a helpful, warm presence people can trust and enjoy talking with."
-        )
