@@ -6,8 +6,9 @@ import asyncio
 class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.api_base_url = "http://localhost:5000"
+        self.api_base_url = "http://127.0.0.1:52653"
         self.generate_endpoint = f"{self.api_base_url}/api/generate"
+        self.api_key = "YOUR_SECRET_TOKEN"  # Put your actual key here
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
@@ -26,7 +27,7 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            user_input = message.content[len(message.content.split()[0]) + 1:].strip()
+            user_input = message.content.split(maxsplit=1)[1] if len(message.content.split()) > 1 else ""
             if not user_input:
                 await message.channel.send("Yes? How can I help?")
                 return
@@ -42,6 +43,11 @@ class CoreGPT(commands.Cog):
                 await self.handle_gpt_response(message, user_input, history=history)
 
     async def handle_gpt_response(self, message, prompt, history=None):
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
         payload = {
             "inputs": prompt,
             "parameters": {
@@ -51,7 +57,10 @@ class CoreGPT(commands.Cog):
         }
 
         try:
-            async with self.session.post(self.generate_endpoint, json=payload, timeout=30) as resp:
+            async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
+                if resp.status == 401:
+                    await message.channel.send("Unauthorized: Invalid or missing API key.")
+                    return
                 if resp.status != 200:
                     await message.channel.send(f"Oops, AI server returned error {resp.status}")
                     return
@@ -77,8 +86,11 @@ class CoreGPT(commands.Cog):
     @checks.is_owner()
     async def gptstatus(self, ctx):
         """Check if AI server is reachable and working."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
         try:
-            async with self.session.get(self.api_base_url) as resp:
+            async with self.session.get(self.api_base_url, headers=headers) as resp:
                 if resp.status == 200:
                     await ctx.send("AI server is up and running!")
                 else:
