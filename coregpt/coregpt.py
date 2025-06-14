@@ -7,7 +7,7 @@ class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=9876543210)
-        default_global = {"api_key": "", "model": "gpt-4o"}
+        default_global = {"api_key": "", "model": "gpt-3.5-turbo"}
         self.config.register_global(**default_global)
         self.client = None
 
@@ -59,7 +59,7 @@ class CoreGPT(commands.Cog):
             try:
                 client = await self.get_client()
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant."},
                         {"role": "user", "content": prompt}
