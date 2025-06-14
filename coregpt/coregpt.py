@@ -10,4 +10,3 @@ async def test_post():
             print(resp.status)
             print(await resp.text())
 
-asyncio.run(test_post())
