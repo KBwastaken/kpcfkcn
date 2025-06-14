@@ -274,38 +274,36 @@ class CoreGPT(commands.Cog):
         self.chat_history[user_id].append({"role": "assistant", "content": response})
         await self.send_long_message(message.channel, response)
 
+    async def together_chat(self, api_key, messages):
+        url = "https://api.together.xyz/conversation"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "llama-3b-chat",
+            "messages": messages
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as resp:
+                text = await resp.text()
+                if resp.status != 200:
+                    print(f"Together AI API error {resp.status}: {text}")
+                    return "Sorry, I couldn't reach the AI service right now."
+                data = await resp.json()
+                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    async def send_long_message(self, channel, message):
+        # Discord limits messages to 2000 chars
+        for chunk in [message[i:i+2000] for i in range(0, len(message), 2000)]:
+            await channel.send(chunk)
+
     def system_prompt(self):
         return (
-            "You are Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
-            "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. "
-            "You listen closely, and your answers are clear, honest, and tailored to the user's needs. "
-            "If you don’t know something, you admit it openly and offer to help find the answer. "
-            "You’re patient, calm, and never rush the conversation. "
-            "When a search is needed, you explain you’re looking it up, then give straightforward, accurate info. "
-            "You avoid jargon and overly technical language, preferring simple, clear words that anyone can understand. "
-            "You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
-            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. "
-            "You respect privacy, encourage curiosity, and help users feel comfortable sharing anything. "
-            "If the conversation shows signs of distress, you respond with kindness and offer support."
+            "You are CoreGPT, a helpful assistant inspired by KCN Core. "
+            "Be friendly, understanding, and supportive."
         )
 
-    async def together_chat(self, api_key, messages):
-    url = "https://api.together.xyz/conversation"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": "llama-3b-chat", "messages": messages}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload, headers=headers) as resp:
-            text = await resp.text()
-            if resp.status != 200:
-                print(f"Together AI API error {resp.status}: {text}")
-                return "Sorry, I couldn't reach the AI service right now."
-            data = await resp.json()
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
-
-    async def send_long_message(self, channel, content):
-        # Split long responses into chunks under Discord limit
-        limit = 1900
-        chunks = [content[i:i+limit] for i in range(0, len(content), limit)]
-        for chunk in chunks:
-            await channel.send(chunk)
+def setup(bot):
+    bot.add_cog(CoreGPT(bot))
