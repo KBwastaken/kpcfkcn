@@ -36,7 +36,6 @@ class CoreGPT(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_permissions(manage_channels=True)
-async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
     async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
         """Set the category for private GPT channels in this server."""
         if not category:
@@ -68,7 +67,10 @@ async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
         # Detect "hey core" start of message
         if content_lower.startswith("hey core"):
             # If "can we talk alone" or "can we talk privately" or "can we talk"
-            if any(phrase in content_lower for phrase in ["can we talk alone", "can we talk privately", "can we talk alone?","can we talk privately?","talk alone","talk privately","talk alone?","talk privately?"]):
+            if any(phrase in content_lower for phrase in [
+                "can we talk alone", "can we talk privately", "can we talk alone?", "can we talk privately?",
+                "talk alone", "talk privately", "talk alone?", "talk privately?"
+            ]):
                 # Start private channel flow
                 if not message.guild:
                     await message.channel.send("This command only works in servers.")
@@ -88,7 +90,10 @@ async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
                 ref = None
             if ref and ref.author.id == self.bot.user.id:
                 # check content for private chat trigger
-                if any(phrase in content_lower for phrase in ["can we talk alone", "can we talk privately", "can we talk alone?","can we talk privately?","talk alone","talk privately","talk alone?","talk privately?"]):
+                if any(phrase in content_lower for phrase in [
+                    "can we talk alone", "can we talk privately", "can we talk alone?", "can we talk privately?",
+                    "talk alone", "talk privately", "talk alone?", "talk privately?"
+                ]):
                     if not message.guild:
                         await message.channel.send("This command only works in servers.")
                         return
@@ -137,9 +142,6 @@ async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
         role = discord.utils.get(guild.roles, name="KCN | Team")
         if role:
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-        else:
-            # We still create channel but no role overwrite
-            pass
 
         channel_name = f"core-chat-{user.name}".lower()
         channel = await category.create_text_channel(channel_name, overwrites=overwrites, reason="Private GPT chat channel")
@@ -242,7 +244,10 @@ async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
             return
 
         # Detect "thank you that's all" or similar to end convo
-        if any(phrase in content_lower for phrase in ["thank you that's all", "thank you thats all", "thanks that's all", "thanks thats all", "that's all", "thats all", "end conversation", "end chat", "stop chat", "close chat"]):
+        if any(phrase in content_lower for phrase in [
+            "thank you that's all", "thank you thats all", "thanks that's all", "thanks thats all",
+            "that's all", "thats all", "end conversation", "end chat", "stop chat", "close chat"
+        ]):
             await channel.send(f"{user.mention} Are you sure you want to end this conversation? Please reply 'yes' or 'no'.")
 
             def end_check(m):
@@ -259,110 +264,79 @@ async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
                 return
 
             if reply.content.lower() == "yes":
-                await channel.send("Okay, ending the conversation and deleting this channel. Take care!")
-                # Remove from dict
-                if guild_id in self.private_channels and user_id in self.private_channels[guild_id]:
-                    del self.private_channels[guild_id][user_id]
+                await channel.send("Ending conversation and deleting this channel...")
+                # Clean up memory and delete channel
+                if guild_id in self.private_channels:
+                    self.private_channels[guild_id].pop(user_id, None)
+                await asyncio.sleep(3)
                 await channel.delete()
-                return
             else:
-                await channel.send("Glad to keep talking with you.")
-
+                await channel.send("Okay, let's keep talking!")
             return
 
-        # Normal GPT continuation in private chat
-        if guild_id not in self.chat_history:
-            self.chat_history[guild_id] = {}
-        if user_id not in self.chat_history[guild_id]:
-            # Start fresh system prompt for private chat
-            self.chat_history[guild_id][user_id] = [
-                {"role": "system", "content": self.get_system_prompt()},
-                {"role": "user", "content": message.content},
-            ]
-        else:
-            self.chat_history[guild_id][user_id].append({"role": "user", "content": message.content})
-
-        key = await self.config.user(user).together_api_key()
-        if not key:
-            await channel.send(f"{user.mention} Please set your Together AI API key using `.gptsetkey` first.")
-            return
-
-        response = await self.together_chat(key, self.chat_history[guild_id][user_id])
-        self.chat_history[guild_id][user_id].append({"role": "assistant", "content": response})
-        await self.send_long_message(channel, response)
+        # Continue chat with Together AI
+        await self.send_togetherai_response(message, private=True)
 
     async def start_convo(self, message):
-        user = message.author
-        user_id = user.id
-        if user_id not in self.chat_history:
-            self.chat_history[user_id] = [
-                {"role": "system", "content": self.get_system_prompt()},
-                {"role": "user", "content": message.content},
-            ]
-        else:
-            self.chat_history[user_id].append({"role": "user", "content": message.content})
-
-        key = await self.config.user(user).together_api_key()
-        if not key:
-            await message.channel.send(f"{user.mention} Please set your Together AI API key using `.gptsetkey` first.")
-            return
-
-        response = await self.together_chat(key, self.chat_history[user_id])
-        self.chat_history[user_id].append({"role": "assistant", "content": response})
-        await self.send_long_message(message.channel, response)
+        # Start convo in the channel where "Hey Core" was said
+        await self.send_togetherai_response(message, private=False)
 
     async def continue_convo(self, message):
+        # Continue convo (used when replying to bot)
+        await self.send_togetherai_response(message, private=False)
+
+    async def send_togetherai_response(self, message, private=False):
         user = message.author
-        user_id = user.id
-        if user_id not in self.chat_history:
-            await self.start_convo(message)
+        content = message.content
+        channel = message.channel
+
+        # Get user's Together AI key
+        api_key = await self.config.user(user).together_api_key()
+        if not api_key:
+            await channel.send(
+                f"{user.mention} You need to set your Together AI API key first using `.gptsetkey [your_api_key]`."
+            )
             return
-        self.chat_history[user_id].append({"role": "user", "content": message.content})
 
-        key = await self.config.user(user).together_api_key()
-        if not key:
-            await message.channel.send(f"{user.mention} Please set your Together AI API key using `.gptsetkey` first.")
-            return
+        # Prepare payload
+        payload = {
+            "prompt": content,
+            "model": "llama-3b",
+            "max_tokens": 250,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "stop_sequences": ["###"],
+        }
 
-        response = await self.together_chat(key, self.chat_history[user_id])
-        self.chat_history[user_id].append({"role": "assistant", "content": response})
-        await self.send_long_message(message.channel, response)
-
-    async def together_chat(self, api_key, messages):
-        url = "https://api.together.xyz/api/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        json_data = {
-            "model": "llama-3-chat",
-            "messages": messages,
-        }
+
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=json_data) as resp:
-                if resp.status != 200:
-                    return f"API Error: {resp.status}"
-                data = await resp.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
+            try:
+                async with session.post(
+                    "https://api.together.ai/v1/generate",
+                    json=payload,
+                    headers=headers,
+                    timeout=60,
+                ) as resp:
+                    if resp.status != 200:
+                        await channel.send(
+                            f"Error from Together AI API: {resp.status} {await resp.text()}"
+                        )
+                        return
+                    data = await resp.json()
+            except Exception as e:
+                await channel.send(f"Error contacting Together AI API: {e}")
+                return
 
-    def get_system_prompt(self):
-        return (
-            "You are CoreGPT, an AI assistant designed to help users with friendly, helpful responses. "
-            "Keep conversations warm, understanding, and concise."
-        )
-
-    async def send_long_message(self, channel, content):
-        if len(content) <= 2000:
-            await channel.send(content)
+        # Extract generated text
+        text = data.get("text") or data.get("response") or ""
+        if not text:
+            await channel.send("Sorry, no response from Together AI.")
             return
-        # Split content on newlines first to keep paragraphs
-        parts = content.split("\n")
-        buffer = ""
-        for part in parts:
-            if len(buffer) + len(part) + 1 > 2000:
-                await channel.send(buffer)
-                buffer = ""
-            buffer += part + "\n"
-        if buffer:
-            await channel.send(buffer)
+
+        # Send reply
+        await channel.send(text)
 
