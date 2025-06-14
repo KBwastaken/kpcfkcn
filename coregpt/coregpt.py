@@ -1,89 +1,101 @@
 import discord
-from redbot.core import commands, checks, Config
+from redbot.core import commands, checks
 import aiohttp
+import asyncio
 
 class CoreGPT(commands.Cog):
-    """Hugging Face integration for Core with conversation memory."""
-
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=123456789)
-        default_global = {
-            "hf_token": ""
-        }
-        self.config.register_global(**default_global)
-        self.histories = {}
+        self.api_url = "http://localhost:5000/api/v1/generate"  # Change if needed
+        self.session = aiohttp.ClientSession()
+        self.conversations = {}  # To keep track of conversation history per user/message
 
-    @commands.is_owner()
-    @commands.command()
-    async def gptstatus(self, ctx):
-        """Check if everything is set up correctly."""
-        hf_token = await self.config.hf_token()
-        status = "✅ HF token set." if hf_token else "❌ HF token missing."
-        await ctx.send(f"CoreGPT status:\n{status}")
-
-    @commands.is_owner()
-    @commands.command()
-    async def sethftoken(self, ctx, hf_token: str):
-        """Set your Hugging Face token."""
-        await self.config.hf_token.set(hf_token)
-        await ctx.send("Hugging Face token saved.")
+    def cog_unload(self):
+        asyncio.create_task(self.session.close())
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
 
-        prefixes = ["hey core", "hi core"]
-        content = message.content.lower()
+        # Check if message starts with "Hey core" or "Hi core" (case insensitive)
+        content_lower = message.content.lower()
+        if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
+            # Remove prefix and any leading/trailing whitespace
+            user_input = message.content[len(message.content.split()[0]) + 1:].strip()
 
-        if any(content.startswith(p) for p in prefixes):
-            user_input = message.content.split(maxsplit=2)
-            if len(user_input) < 3:
-                await message.channel.send("What do you want me to do?")
+            if not user_input:
+                await message.channel.send("Yes? How can I help?")
                 return
 
-            prompt = message.content[len(user_input[0]) + 1:]
-            await self.handle_gpt(message, prompt)
+            await self.handle_gpt_response(message, user_input)
 
+        # If user replies to bot message, continue conversation
         elif message.reference:
-            try:
-                ref_msg = await message.channel.fetch_message(message.reference.message_id)
-                if ref_msg.author.id == self.bot.user.id:
-                    await self.handle_gpt(message, message.content)
-            except Exception:
-                pass
+            ref_msg = message.reference.resolved
+            if ref_msg and ref_msg.author == self.bot.user:
+                # Use conversation memory key (e.g. channel id + author id)
+                conv_key = f"{message.channel.id}-{message.author.id}"
+                history = self.conversations.get(conv_key, [])
+                user_input = message.content.strip()
 
-    async def handle_gpt(self, message, user_input):
-        hf_token = await self.config.hf_token()
-        if not hf_token:
-            await message.channel.send("Hugging Face token not set. Use [p]sethftoken.")
-            return
+                # Append user input to history
+                history.append({"role": "user", "content": user_input})
 
-        user_id = message.author.id
-        history = self.histories.get(user_id, [])
-        history.append(user_input)
+                await self.handle_gpt_response(message, user_input, history=history)
 
-        # Keep last 5 lines to limit prompt size
-        short_history = history[-5:]
-        prompt = "\n".join(short_history)
+    async def handle_gpt_response(self, message, prompt, history=None):
+        # Build payload for your local AI (adjust if your API expects different)
+        payload = {
+            "prompt": prompt,
+            "max_tokens": 150,
+            "temperature": 0.7,
+        }
 
-        async with aiohttp.ClientSession() as session:
-            url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
-            headers = {
-                "Authorization": f"Bearer {hf_token}",
-                "Content-Type": "application/json"
-            }
-            json_data = {
-                "inputs": prompt
-            }
+        # You can implement conversation memory here if your API supports it
+        if history:
+            # Example: concatenate history with prompt
+            full_prompt = ""
+            for entry in history:
+                full_prompt += f"{entry['role']}: {entry['content']}\n"
+            full_prompt += f"user: {prompt}\n"
+            payload["prompt"] = full_prompt
 
-            async with session.post(url, headers=headers, json=json_data) as resp:
+        try:
+            async with self.session.post(self.api_url, json=payload, timeout=30) as resp:
                 if resp.status != 200:
-                    await message.channel.send(f"Error: {resp.status}")
+                    await message.channel.send(f"Oops, AI server returned error {resp.status}")
                     return
                 data = await resp.json()
-                reply = data[0]["generated_text"].split(prompt, 1)[-1].strip()
-                history.append(reply)
-                self.histories[user_id] = history
-                await message.channel.send(reply)
+                # Extract the generated text depending on your API
+                # Here we assume response format: {"results": [{"text": "..."}]}
+                text = data.get("results", [{}])[0].get("text", None)
+                if not text:
+                    await message.channel.send("Hmm, I didn’t get a response from AI.")
+                    return
+
+                await message.channel.send(text.strip())
+
+                # Save conversation history
+                conv_key = f"{message.channel.id}-{message.author.id}"
+                history = history or []
+                history.append({"role": "assistant", "content": text.strip()})
+                self.conversations[conv_key] = history
+
+        except asyncio.TimeoutError:
+            await message.channel.send("AI server took too long to respond.")
+        except Exception as e:
+            await message.channel.send(f"Something went wrong: {e}")
+
+    @commands.command()
+    @checks.is_owner()
+    async def gptstatus(self, ctx):
+        """Check if AI server is reachable and working."""
+        try:
+            async with self.session.get(f"{self.api_url}/status", timeout=10) as resp:
+                if resp.status == 200:
+                    await ctx.send("AI server is up and running!")
+                else:
+                    await ctx.send(f"AI server responded with status code {resp.status}")
+        except Exception as e:
+            await ctx.send(f"Could not reach AI server: {e}")
