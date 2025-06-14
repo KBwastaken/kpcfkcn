@@ -7,7 +7,7 @@ class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.api_base_url = "http://localhost:5000"
-        self.generate_endpoint = f"{self.api_base_url}/generate"
+        self.generate_endpoint = f"{self.api_base_url}/api/v1/generate"
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
@@ -43,17 +43,12 @@ class CoreGPT(commands.Cog):
 
     async def handle_gpt_response(self, message, prompt, history=None):
         payload = {
-            "prompt": prompt,
-            "max_tokens": 150,
-            "temperature": 0.7,
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 150,
+                "temperature": 0.7
+            }
         }
-
-        if history:
-            full_prompt = ""
-            for entry in history:
-                full_prompt += f"{entry['role']}: {entry['content']}\n"
-            full_prompt += f"user: {prompt}\n"
-            payload["prompt"] = full_prompt
 
         try:
             async with self.session.post(self.generate_endpoint, json=payload, timeout=30) as resp:
@@ -61,7 +56,7 @@ class CoreGPT(commands.Cog):
                     await message.channel.send(f"Oops, AI server returned error {resp.status}")
                     return
                 data = await resp.json()
-                text = data.get("results", [{}])[0].get("text", None)
+                text = data.get("results", [{}])[0].get("text") or data.get("generated_text")
                 if not text:
                     await message.channel.send("Hmm, I didn’t get a response from AI.")
                     return
