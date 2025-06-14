@@ -269,99 +269,65 @@ class CoreGPT(commands.Cog):
 
             return
 
-        # Normal GPT continuation in private chat
-        if guild_id not in self.chat_history:
-            self.chat_history[guild_id] = {}
-        if user_id not in self.chat_history[guild_id]:
-            # Start fresh system prompt for private chat
-            self.chat_history[guild_id][user_id] = [
-                {"role": "system", "content": self.get_system_prompt()},
-                {"role": "user", "content": message.content},
-            ]
-        else:
-            self.chat_history[guild_id][user_id].append({"role": "user", "content": message.content})
-
-        key = await self.config.user(user).together_api_key()
-        if not key:
-            await channel.send(f"{user.mention} Please set your Together AI API key using `.gptsetkey` first.")
-            return
-
-        response = await self.together_chat(key, self.chat_history[guild_id][user_id])
-        self.chat_history[guild_id][user_id].append({"role": "assistant", "content": response})
-        await self.send_long_message(channel, response)
+        # Normal conversation flow
+        await self.send_to_llama(message, is_private=True)
 
     async def start_convo(self, message):
-        user = message.author
-        user_id = user.id
-        if user_id not in self.chat_history:
-            self.chat_history[user_id] = [
-                {"role": "system", "content": self.get_system_prompt()},
-                {"role": "user", "content": message.content},
-            ]
-        else:
-            self.chat_history[user_id].append({"role": "user", "content": message.content})
+        user_id = message.author.id
+        self.chat_history[user_id] = [{"role": "user", "content": message.content}]
 
-        key = await self.config.user(user).together_api_key()
-        if not key:
-            await message.channel.send(f"{user.mention} Please set your Together AI API key using `.gptsetkey` first.")
-            return
-
-        response = await self.together_chat(key, self.chat_history[user_id])
-        self.chat_history[user_id].append({"role": "assistant", "content": response})
-        await self.send_long_message(message.channel, response)
+        await self.send_to_llama(message, is_private=False)
 
     async def continue_convo(self, message):
-        user = message.author
-        user_id = user.id
+        user_id = message.author.id
         if user_id not in self.chat_history:
-            await self.start_convo(message)
-            return
+            self.chat_history[user_id] = []
         self.chat_history[user_id].append({"role": "user", "content": message.content})
 
+        await self.send_to_llama(message, is_private=False)
+
+    async def send_to_llama(self, message, is_private=False):
+        user = message.author
+        user_id = user.id
         key = await self.config.user(user).together_api_key()
         if not key:
-            await message.channel.send(f"{user.mention} Please set your Together AI API key using `.gptsetkey` first.")
+            await message.channel.send(f"{user.mention}, you need to set your Together AI API key first using `.gptsetkey <yourkey>`.")
             return
 
-        response = await self.together_chat(key, self.chat_history[user_id])
-        self.chat_history[user_id].append({"role": "assistant", "content": response})
-        await self.send_long_message(message.channel, response)
+        # Prepare conversation messages for API
+        messages = self.chat_history.get(user_id, [])
+        if not messages:
+            messages = [{"role": "user", "content": message.content}]
 
-    async def together_chat(self, api_key, messages):
-        url = "https://api.together.xyz/api/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        json_data = {
-            "model": "llama-3-chat",
+        # Build payload for Together AI Llama 3 endpoint
+        data = {
+            "model": "llama-3b",
             "messages": messages,
         }
+
+        headers = {"Authorization": f"Bearer {key}"}
+
+        url = "https://api.together.xyz/v3/llama"
+
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=json_data) as resp:
-                if resp.status != 200:
-                    return f"API Error: {resp.status}"
-                data = await resp.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "No response")
+            try:
+                async with session.post(url, json=data, headers=headers, timeout=30) as resp:
+                    if resp.status != 200:
+                        await message.channel.send(f"{user.mention} API error: {resp.status}")
+                        return
+                    result = await resp.json()
+            except Exception as e:
+                await message.channel.send(f"{user.mention} API request failed: {e}")
+                return
 
-    def get_system_prompt(self):
-        return (
-            "You are CoreGPT, an AI assistant designed to help users with friendly, helpful responses. "
-            "Keep conversations warm, understanding, and concise."
-        )
+        # Extract reply
+        reply_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not reply_text:
+            reply_text = "Sorry, I didn't get a response."
 
-    async def send_long_message(self, channel, content):
-        if len(content) <= 2000:
-            await channel.send(content)
-            return
-        # Split content on newlines first to keep paragraphs
-        parts = content.split("\n")
-        buffer = ""
-        for part in parts:
-            if len(buffer) + len(part) + 1 > 2000:
-                await channel.send(buffer)
-                buffer = ""
-            buffer += part + "\n"
-        if buffer:
-            await channel.send(buffer)
+        # Add bot reply to history
+        if user_id not in self.chat_history:
+            self.chat_history[user_id] = []
+        self.chat_history[user_id].append({"role": "assistant", "content": reply_text})
 
+        await message.channel.send(reply_text)
