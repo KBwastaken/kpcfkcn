@@ -7,7 +7,7 @@ class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.api_base_url = "http://localhost:5000"
-        self.generate_endpoint = f"{self.api_base_url}/generate"
+        self.generate_endpoint = f"{self.api_base_url}/api/generate"
         self.session = None
         self.conversations = {}
         self.bot.loop.create_task(self.async_init())
