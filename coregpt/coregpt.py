@@ -27,7 +27,6 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            # Extract what user said after prefix
             parts = message.content.split(maxsplit=2)
             user_input = parts[2] if len(parts) > 2 else ""
             if not user_input:
@@ -36,7 +35,6 @@ class CoreGPT(commands.Cog):
             await self.handle_gpt_response(message, user_input)
 
         elif message.reference:
-            # Continue convo if user replied to bot message
             ref_msg = message.reference.resolved
             if ref_msg and ref_msg.author == self.bot.user:
                 conv_key = f"{message.channel.id}-{message.author.id}"
@@ -52,7 +50,9 @@ class CoreGPT(commands.Cog):
         }
 
         payload = {
-            "prompt": prompt
+            "data": {
+                "inputs": prompt
+            }
         }
 
         try:
@@ -62,7 +62,11 @@ class CoreGPT(commands.Cog):
                     await message.channel.send(f"AI server error {resp.status}: {error_text}")
                     return
                 data = await resp.json()
-                text = data.get("results", [{}])[0].get("text") or data.get("generated_text") or data.get("text")
+                text = (
+                    data.get("results", [{}])[0].get("text") or
+                    data.get("generated_text") or
+                    data.get("text")
+                )
                 if not text:
                     await message.channel.send("Hmm, I didn’t get a response from AI.")
                     return
