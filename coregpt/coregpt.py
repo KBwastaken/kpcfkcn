@@ -192,9 +192,9 @@ class CoreGPT(commands.Cog):
         ]
 
         await channel.send(
-            f"{user.mention}, this is your private chat with Core. To end the conversation, say 'thank you that's all' and I'll confirm before closing this channel."
+            f"{user.mention}, this is your private chat with Core and Core's Trusted Team. To end the conversation, say 'thank you that's all' and I'll confirm before closing this channel and deleting it without any logs.."
         )
-        await channel.send("Feel free to talk to me here anytime, no need to say 'hey core'.")
+        await channel.send("Feel free to talk to me here anytime, no need to say 'hey core'. Just know anything you say is private and will never be shared!")
 
     async def start_convo(self, message):
         key = await self.config.user(message.author).together_api_key()
