@@ -27,14 +27,16 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            parts = message.content.split(maxsplit=1)
-            user_input = parts[1] if len(parts) > 1 else ""
+            # Extract what user said after prefix
+            parts = message.content.split(maxsplit=2)
+            user_input = parts[2] if len(parts) > 2 else ""
             if not user_input:
                 await message.channel.send("Yes? How can I help?")
                 return
             await self.handle_gpt_response(message, user_input)
 
         elif message.reference:
+            # Continue convo if user replied to bot message
             ref_msg = message.reference.resolved
             if ref_msg and ref_msg.author == self.bot.user:
                 conv_key = f"{message.channel.id}-{message.author.id}"
@@ -50,20 +52,17 @@ class CoreGPT(commands.Cog):
         }
 
         payload = {
-    "inputs": prompt
-}
+            "prompt": prompt
+        }
 
-     
         try:
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
-                if resp.status == 401:
-                    await message.channel.send("Unauthorized: Invalid or missing API key.")
-                    return
                 if resp.status != 200:
-                    await message.channel.send(f"Oops, AI server returned error {resp.status}")
+                    error_text = await resp.text()
+                    await message.channel.send(f"AI server error {resp.status}: {error_text}")
                     return
                 data = await resp.json()
-                text = data.get("results", [{}])[0].get("text") or data.get("generated_text")
+                text = data.get("results", [{}])[0].get("text") or data.get("generated_text") or data.get("text")
                 if not text:
                     await message.channel.send("Hmm, I didn’t get a response from AI.")
                     return
