@@ -1,108 +1,46 @@
+import openai
+from redbot.core import commands, Config
 import discord
-from redbot.core import commands, checks
-import aiohttp
-import asyncio
 
 class CoreGPT(commands.Cog):
+    """A simple ChatGPT Cog"""
+
     def __init__(self, bot):
         self.bot = bot
-        self.api_base_url = "http://127.0.0.1:52653"
-        self.generate_endpoint = f"{self.api_base_url}/api/generate"
-        self.api_key = "YOUR_SECRET_TOKEN"  # Replace with your actual key
-        self.session = None
-        self.conversations = {}
-        self.bot.loop.create_task(self.async_init())
+        self.config = Config.get_conf(self, identifier=1234567890)
+        default_global = {"api_key": ""}
+        self.config.register_global(**default_global)
 
-    async def async_init(self):
-        self.session = aiohttp.ClientSession()
+    @commands.group()
+    async def coregpt(self, ctx):
+        """ChatGPT Cog"""
+        pass
 
-    def cog_unload(self):
-        if self.session:
-            asyncio.create_task(self.session.close())
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot:
-            return
-
-        content_lower = message.content.lower()
-        if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            parts = message.content.split(maxsplit=1)
-            user_input = parts[1] if len(parts) > 1 else ""
-            if not user_input:
-                await message.channel.send("Yes? How can I help?")
-                return
-            await self.handle_gpt_response(message, user_input)
-
-        elif message.reference:
-            ref_msg = message.reference.resolved
-            if ref_msg and ref_msg.author == self.bot.user:
-                conv_key = f"{message.channel.id}-{message.author.id}"
-                history = self.conversations.get(conv_key, [])
-                user_input = message.content.strip()
-                history.append({"role": "user", "content": user_input})
-                await self.handle_gpt_response(message, user_input, history=history)
-
-    async def handle_gpt_response(self, message, prompt, history=None):
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "data": [
-                {
-                    "inputs": [prompt],
-                    "parameters": {
-                        "max_new_tokens": 150,
-                        "temperature": 0.7
-                    }
-                }
-            ]
-        }
-
-        try:
-            async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
-                if resp.status == 401:
-                    await message.channel.send("Unauthorized: Invalid or missing API key.")
-                    return
-                if resp.status == 422:
-                    text = await resp.text()
-                    await message.channel.send(f"Invalid request (422): {text}")
-                    return
-                if resp.status != 200:
-                    await message.channel.send(f"Oops, AI server returned error {resp.status}")
-                    return
-                data = await resp.json()
-                text = data.get("results", [{}])[0].get("text") or data.get("generated_text")
-                if not text:
-                    await message.channel.send("Hmm, I didn’t get a response from AI.")
-                    return
-
-                await message.channel.send(text.strip())
-
-                conv_key = f"{message.channel.id}-{message.author.id}"
-                history = history or []
-                history.append({"role": "assistant", "content": text.strip()})
-                self.conversations[conv_key] = history
-
-        except asyncio.TimeoutError:
-            await message.channel.send("AI server took too long to respond.")
-        except Exception as e:
-            await message.channel.send(f"Something went wrong: {e}")
+    @coregpt.command()
+    async def setkey(self, ctx, key: str):
+        """Set your OpenAI API key"""
+        await self.config.api_key.set(key)
+        await ctx.send("API key set successfully.")
 
     @commands.command()
-    @checks.is_owner()
-    async def gptstatus(self, ctx):
-        """Check if AI server is reachable and working."""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
+    async def ask(self, ctx, *, prompt: str):
+        """Ask ChatGPT something"""
+        api_key = await self.config.api_key()
+        if not api_key:
+            await ctx.send("API key not set. Use `[p]coregpt setkey YOUR_API_KEY` first.")
+            return
+
+        openai.api_key = api_key
+
         try:
-            async with self.session.get(self.api_base_url, headers=headers) as resp:
-                if resp.status == 200:
-                    await ctx.send("AI server is up and running!")
-                else:
-                    await ctx.send(f"AI server responded with status code {resp.status}")
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            answer = response.choices[0].message.content
+            await ctx.send(answer)
         except Exception as e:
-            await ctx.send(f"Could not reach AI server: {e}")
+            await ctx.send(f"Error: {e}")
