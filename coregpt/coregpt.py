@@ -35,7 +35,7 @@ class CoreGPT(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_channels=True)
     async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
         """Set the category for private GPT channels in this server."""
         if not category:
