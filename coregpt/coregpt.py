@@ -8,11 +8,16 @@ class CoreGPT(commands.Cog):
         self.bot = bot
         self.api_base_url = "http://localhost:5000"
         self.generate_endpoint = f"{self.api_base_url}/generate"
-        self.session = aiohttp.ClientSession()
+        self.session = None
         self.conversations = {}
+        self.bot.loop.create_task(self.async_init())
+
+    async def async_init(self):
+        self.session = aiohttp.ClientSession()
 
     def cog_unload(self):
-        asyncio.create_task(self.session.close())
+        if self.session:
+            asyncio.create_task(self.session.close())
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -21,7 +26,6 @@ class CoreGPT(commands.Cog):
 
         content_lower = message.content.lower()
         if content_lower.startswith("hey core") or content_lower.startswith("hi core"):
-            # strip the prefix and whitespace
             user_input = message.content[len(message.content.split()[0]) + 1:].strip()
             if not user_input:
                 await message.channel.send("Yes? How can I help?")
@@ -29,7 +33,6 @@ class CoreGPT(commands.Cog):
             await self.handle_gpt_response(message, user_input)
 
         elif message.reference:
-            # continue conversation when replying to bot's message
             ref_msg = message.reference.resolved
             if ref_msg and ref_msg.author == self.bot.user:
                 conv_key = f"{message.channel.id}-{message.author.id}"
