@@ -6,7 +6,8 @@ import asyncio
 class CoreGPT(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.api_url = self.api_url = "http://localhost:5000/" # Updated endpoint
+        self.api_base_url = "http://localhost:5000"
+        self.generate_endpoint = f"{self.api_base_url}/generate"
         self.session = aiohttp.ClientSession()
         self.conversations = {}
 
@@ -50,7 +51,7 @@ class CoreGPT(commands.Cog):
             payload["prompt"] = full_prompt
 
         try:
-            async with self.session.post(self.api_url, json=payload, timeout=30) as resp:
+            async with self.session.post(self.generate_endpoint, json=payload, timeout=30) as resp:
                 if resp.status != 200:
                     await message.channel.send(f"Oops, AI server returned error {resp.status}")
                     return
@@ -77,7 +78,7 @@ class CoreGPT(commands.Cog):
     async def gptstatus(self, ctx):
         """Check if AI server is reachable and working."""
         try:
-            async with self.session.get("http://localhost:5000") as resp:
+            async with self.session.get(self.api_base_url) as resp:
                 if resp.status == 200:
                     await ctx.send("AI server is up and running!")
                 else:
