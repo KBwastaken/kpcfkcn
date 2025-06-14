@@ -47,14 +47,12 @@ class CoreGPT(commands.Cog):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-
-        # Corrected payload with "data" as a list containing one dict
         payload = {
-            "data": [
-                {
-                    "inputs": prompt
-                }
-            ]
+            "inputs": [prompt],
+            "parameters": {
+                "max_new_tokens": 150,
+                "temperature": 0.7
+            }
         }
 
         try:
@@ -66,12 +64,8 @@ class CoreGPT(commands.Cog):
                     await message.channel.send(f"Oops, AI server returned error {resp.status}")
                     return
                 data = await resp.json()
-                # Adjust parsing based on your server's response structure
-                text = None
-                if "results" in data and isinstance(data["results"], list):
-                    text = data["results"][0].get("text")
-                elif "generated_text" in data:
-                    text = data["generated_text"]
+                # Your simple AI server returns a single "text" string
+                text = data.get("text") or data.get("generated_text")
                 if not text:
                     await message.channel.send("Hmm, I didn’t get a response from AI.")
                     return
