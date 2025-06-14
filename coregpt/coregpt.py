@@ -50,13 +50,10 @@ class CoreGPT(commands.Cog):
         }
 
         payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 150,
-                "temperature": 0.7
-            }
-        }
+    "inputs": prompt
+}
 
+     
         try:
             async with self.session.post(self.generate_endpoint, json=payload, headers=headers, timeout=30) as resp:
                 if resp.status == 401:
