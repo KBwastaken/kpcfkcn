@@ -1,4 +1,5 @@
 from .coregpt import CoreGPT
 
 async def setup(bot):
-    await bot.add_cog(CoreGPT(bot))
+    cog = CoreGPT(bot)
+    await bot.add_cog(cog)
