@@ -1,11 +1,10 @@
 import discord
-from discord.ext import commands
-from redbot.core import Config
+from redbot.core import commands, Config
 import aiohttp
 import asyncio
 
 class CoreGPT(commands.Cog):
-    """CoreGPT: Talk to Together AI's free Llama-3, with convo threading and private chats."""
+    """CoreGPT: Talk to Together AI's free Llama-3, with convo threading, plus private chats."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -14,9 +13,8 @@ class CoreGPT(commands.Cog):
         default_guild = {"private_category": None}
         self.config.register_user(**default_user)
         self.config.register_guild(**default_guild)
-
-        self.chat_history = {}  # user_id -> list of messages
-        self.private_channels = {}  # guild_id -> {user_id: channel_id}
+        self.chat_history = {}  # user_id: messages list for convo memory
+        self.private_channels = {}  # channel_id: user_id for private chats
 
     @commands.command()
     async def gptsetkey(self, ctx, key):
@@ -35,299 +33,278 @@ class CoreGPT(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_permissions(manage_channels=True)
-    async def gptsetcategory(self, ctx, category: discord.CategoryChannel = None):
-        """Set the category for private GPT channels in this server."""
-        if not category:
-            await self.config.guild(ctx.guild).private_category.set(None)
-            await ctx.send("Private chat category unset.")
-            return
-        if category.guild != ctx.guild:
-            await ctx.send("Please provide a category from this server.")
-            return
+    @commands.admin()
+    async def gptsetcategory(self, ctx, category: discord.CategoryChannel):
+        """Set the category for private CoreGPT chats."""
         await self.config.guild(ctx.guild).private_category.set(category.id)
         await ctx.send(f"Private chat category set to: {category.name}")
+
+    async def detect_distress(self, api_key, messages):
+        # Ask the AI if the user seems in emotional distress or crisis
+        check_messages = messages + [
+            {
+                "role": "system",
+                "content": (
+                    "Based on the conversation, does the user seem to be in emotional distress or crisis? "
+                    "Answer only with 'yes' or 'no'."
+                )
+            }
+        ]
+        response = await self.together_chat(api_key, check_messages)
+        return "yes" in response.lower()
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
-        # Check if message is in a private chat channel created by bot
-        if message.guild:
-            guild_id = message.guild.id
-            user_id = message.author.id
-            private_chs = self.private_channels.get(guild_id, {})
-            if user_id in private_chs and private_chs[user_id] == message.channel.id:
-                await self.handle_private_chat(message)
+        user = message.author
+        guild = message.guild
+        content = message.content.lower()
+
+        private_triggers = [
+            "can we talk privately", "can we talk alone", "talk alone", "talk privately"
+        ]
+
+        # Check if this is a private chat channel
+        if message.channel.id in self.private_channels:
+            user_id = self.private_channels[message.channel.id]
+            key = await self.config.user(user).together_api_key()
+
+            if not key:
+                await message.channel.send("Please set your Together AI API key with `.gptsetkey` to chat here.")
                 return
 
-        content_lower = message.content.lower()
+            # Prepare recent messages for distress detection
+            recent_msgs = self.chat_history.get(user_id, [{"role": "system", "content": self.system_prompt()}]) + [{"role": "user", "content": message.content}]
 
-        # Detect "hey core" start of message
-        if content_lower.startswith("hey core"):
-            # If "can we talk alone" or "can we talk privately" or "can we talk"
-            if any(phrase in content_lower for phrase in ["can we talk alone", "can we talk privately", "can we talk alone?","can we talk privately?","talk alone","talk privately","talk alone?","talk privately?"]):
-                # Start private channel flow
-                if not message.guild:
-                    await message.channel.send("This command only works in servers.")
+            distress = await self.detect_distress(key, recent_msgs)
+
+            if distress:
+                await message.channel.send(
+                    f"{user.mention}, it looks like you might be struggling right now. "
+                    "Do you want me to ping a real human to assist you? Please reply with 'yes' or 'no'."
+                )
+
+                def comfort_check(m):
+                    return (
+                        m.author.id == user_id and
+                        m.channel.id == message.channel.id and
+                        m.content.lower() in ["yes", "no"]
+                    )
+
+                try:
+                    reply = await self.bot.wait_for("message", check=comfort_check, timeout=60)
+                except asyncio.TimeoutError:
+                    await message.channel.send("No response received. I'm here if you want to talk more.")
                     return
-                await self.create_private_channel(message)
-                return
-            else:
-                # normal core convo start
-                await self.start_convo(message)
+
+                if reply.content.lower() == "yes":
+                    role = discord.utils.get(guild.roles, name="KCN | Team")
+                    if role:
+                        await message.channel.send(f"{role.mention}, {user.mention} needs assistance.")
+                        await message.channel.send("I've pinged the KCN | Team for you.")
+                    else:
+                        await message.channel.send(
+                            "Sorry, I couldn't find the 'KCN | Team' role to ping. Please reach out directly."
+                        )
+                else:
+                    await message.channel.send("Okay, I'm here to listen if you want to keep talking.")
+
                 return
 
-        # If message is a reply to any bot message and contains "can we talk alone" etc
+            # Check for ending conversation phrases
+            end_phrases = [
+                "thank you that's all", "thank you thats all", "thank you, that's all",
+                "thank you", "that's all", "thanks"
+            ]
+            if any(phrase in content for phrase in end_phrases) and user.id == user_id:
+                confirm_msg = await message.channel.send(
+                    f"{user.mention} Are you sure you want to end our conversation? Please reply with 'yes' or 'no'."
+                )
+
+                def check(m):
+                    return (
+                        m.author.id == user_id and
+                        m.channel.id == message.channel.id and
+                        m.content.lower() in ["yes", "no"]
+                    )
+
+                try:
+                    reply = await self.bot.wait_for("message", check=check, timeout=60)
+                except asyncio.TimeoutError:
+                    await message.channel.send("No response. Continuing the conversation.")
+                    return
+
+                if reply.content.lower() == "yes":
+                    await message.channel.send("Alright, ending our conversation. Goodbye!")
+                    if user_id in self.chat_history:
+                        del self.chat_history[user_id]
+                    await asyncio.sleep(3)
+                    await message.channel.delete()
+                    del self.private_channels[message.channel.id]
+                    return
+                else:
+                    await message.channel.send("Okay, continuing our chat.")
+                    return
+
+            # Normal private convo flow
+            if user_id not in self.chat_history:
+                self.chat_history[user_id] = [
+                    {"role": "system", "content": self.system_prompt()}
+                ]
+
+            self.chat_history[user_id].append({"role": "user", "content": message.content})
+
+            response = await self.together_chat(key, self.chat_history[user_id])
+            self.chat_history[user_id].append({"role": "assistant", "content": response})
+
+            await self.send_long_message(message.channel, response)
+            return
+
+        # Check private chat triggers:
+        is_private_trigger = False
+
+        if content.startswith("hey core"):
+            after_hey_core = content[7:].strip()
+            if any(trigger in after_hey_core for trigger in private_triggers):
+                is_private_trigger = True
+
+        elif message.reference:
+            try:
+                ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                if ref_msg.author.id == self.bot.user.id:
+                    if any(trigger in content for trigger in private_triggers):
+                        is_private_trigger = True
+            except Exception:
+                pass
+
+        if is_private_trigger:
+            await self.start_private_chat(message)
+            return
+
+        # Original Core convo triggers:
+
+        if content.startswith(("hey core", "hi core")):
+            await self.start_convo(message)
+            return
+
         if message.reference:
             try:
                 ref = await message.channel.fetch_message(message.reference.message_id)
-            except (discord.NotFound, discord.Forbidden):
-                ref = None
-            if ref and ref.author.id == self.bot.user.id:
-                # check content for private chat trigger
-                if any(phrase in content_lower for phrase in ["can we talk alone", "can we talk privately", "can we talk alone?","can we talk privately?","talk alone","talk privately","talk alone?","talk privately?"]):
-                    if not message.guild:
-                        await message.channel.send("This command only works in servers.")
-                        return
-                    await self.create_private_channel(message)
-                    return
-                else:
-                    # continue normal convo
+                if ref and ref.author.id == self.bot.user.id:
                     await self.continue_convo(message)
-                    return
+            except Exception:
+                pass
 
-        # If message is in DM or no private triggers, just ignore
-
-    async def create_private_channel(self, message):
-        guild = message.guild
+    async def start_private_chat(self, message):
         user = message.author
+        guild = message.guild
+
         category_id = await self.config.guild(guild).private_category()
         if not category_id:
-            await message.channel.send("No private chat category set in this server. Please contact kkkkayaaaaa.")
+            await message.channel.send("No private chat category is set for this server. Please contact kkkkayaaaaa to set one.")
             return
 
-        category = guild.get_channel(category_id)
-        if not category or not isinstance(category, discord.CategoryChannel):
-            await message.channel.send("The private chat category is invalid or missing. Please contact kkkkayaaaaa.")
+        category = discord.utils.get(guild.categories, id=category_id)
+        if not category:
+            await message.channel.send("Configured private chat category not found on this server. Please contact kkkkayaaaaa.")
             return
 
-        # Check if user already has a private channel in this guild
-        if guild.id not in self.private_channels:
-            self.private_channels[guild.id] = {}
-        if user.id in self.private_channels[guild.id]:
-            existing_ch = guild.get_channel(self.private_channels[guild.id][user.id])
-            if existing_ch:
-                await message.channel.send(f"{user.mention} You already have a private chat channel: {existing_ch.mention}")
-                return
-            else:
-                # channel missing, remove from dict
-                del self.private_channels[guild.id][user.id]
+        # Check if user already has a private channel open
+        for ch_id, u_id in self.private_channels.items():
+            if u_id == user.id:
+                channel = guild.get_channel(ch_id)
+                if channel:
+                    await message.channel.send(f"{user.mention}, you already have a private chat here: {channel.mention}")
+                    return
 
-        # Create private channel
         overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True, mention_everyone=False),
+            self.bot.user: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
 
-        # Make sure role "KCN | Team" can view and send messages but not mention @everyone
-        role = discord.utils.get(guild.roles, name="KCN | Team")
-        if role:
-            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-        else:
-            # We still create channel but no role overwrite
-            pass
-
-        channel_name = f"core-chat-{user.name}".lower()
-        channel = await category.create_text_channel(channel_name, overwrites=overwrites, reason="Private GPT chat channel")
-
-        # Save channel id
-        self.private_channels[guild.id][user.id] = channel.id
-
-        # Send intro message with ping, mention-only setup
-        await channel.send(
-            f"{user.mention} This is your private chat with Core. If you ever want to end our conversation, just say 'thank you that's all' or something similar and I'll ask for confirmation and then delete this channel."
+        channel = await guild.create_text_channel(
+            name=f"core-private-{user.name}",
+            category=category,
+            overwrites=overwrites,
+            reason="Private chat channel for CoreGPT user"
         )
 
-        await message.channel.send(f"{user.mention} Your private chat channel has been created: {channel.mention}")
-
-    async def handle_private_chat(self, message):
-        user = message.author
-        channel = message.channel
-        guild = message.guild
-        user_id = user.id
-        guild_id = guild.id
-
-        # Make sure channel is mention-only (override @everyone and here)
-        overwrites = channel.overwrites_for(guild.default_role)
-        if overwrites.view_channel != False or overwrites.send_messages != False:
-            await channel.set_permissions(guild.default_role, view_channel=False, send_messages=False)
-
-        # Detect serious distress phrases
-        warning_phrases = [
-            "i want to kms",
-            "i don't want this anymore",
-            "i dont want this anymore",
-            "i'm being abused",
-            "im being abused",
-            "i feel hopeless",
-            "i can't take this",
-            "i cant take this",
-            "i want to die",
-            "i hate myself",
-            "i'm so alone",
-            "im so alone",
-            "i want to end it",
-            "i can't do this anymore",
-            "im struggling",
-            "i'm being bullied",
-            "im bullied",
-            "being bullied",
-            "they keep bullying me",
-            "they're bullying me",
-            "i feel worthless",
-            "nobody cares about me",
-            "i feel like giving up",
-            "i'm overwhelmed",
-            "im overwhelmed",
-            "please help me",
-            "i feel trapped",
-            "i don't see a way out",
-            "i dont see a way out",
-            "i am depressed",
-            "im depressed",
-            "no one loves me",
-            "i don't want to live",
-            "im hurting",
-            "i'm hurting",
-            "suicidal",
-            "i feel broken",
+        self.private_channels[channel.id] = user.id
+        self.chat_history[user.id] = [
+            {"role": "system", "content": self.system_prompt()}
         ]
 
-        content_lower = message.content.lower()
-
-        if any(phrase in content_lower for phrase in warning_phrases):
-            await channel.send(
-                f"{user.mention}, it sounds like you're really struggling right now. "
-                "Do you want me to ping a real human to assist you? Please reply with 'yes' or 'no'."
-            )
-
-            def comfort_check(m):
-                return (
-                    m.author.id == user.id
-                    and m.channel.id == channel.id
-                    and m.content.lower() in ["yes", "no"]
-                )
-
-            try:
-                reply = await self.bot.wait_for("message", check=comfort_check, timeout=60)
-            except asyncio.TimeoutError:
-                await channel.send("No response received. I'm here if you want to talk more.")
-                return
-
-            if reply.content.lower() == "yes":
-                role = discord.utils.get(guild.roles, name="KCN | Team")
-                if role:
-                    await channel.send(f"{role.mention}, {user.mention} needs assistance.")
-                    await channel.send("I've pinged the KCN | Team for you.")
-                else:
-                    await channel.send(
-                        "Sorry, I couldn't find the 'KCN | Team' role to ping. Please reach out directly."
-                    )
-            else:
-                await channel.send("Okay, I'm here to listen if you want to keep talking.")
-            return
-
-        # Detect "thank you that's all" or similar to end convo
-        if any(phrase in content_lower for phrase in ["thank you that's all", "thank you thats all", "thanks that's all", "thanks thats all", "that's all", "thats all", "end conversation", "end chat", "stop chat", "close chat"]):
-            await channel.send(f"{user.mention} Are you sure you want to end this conversation? Please reply 'yes' or 'no'.")
-
-            def end_check(m):
-                return (
-                    m.author.id == user.id
-                    and m.channel.id == channel.id
-                    and m.content.lower() in ["yes", "no"]
-                )
-
-            try:
-                reply = await self.bot.wait_for("message", check=end_check, timeout=30)
-            except asyncio.TimeoutError:
-                await channel.send("No response received. Continuing the conversation.")
-                return
-
-            if reply.content.lower() == "yes":
-                await channel.send("Okay, ending the conversation and deleting this channel. Take care!")
-                # Remove from dict
-                if guild_id in self.private_channels and user_id in self.private_channels[guild_id]:
-                    del self.private_channels[guild_id][user_id]
-                await channel.delete()
-                return
-            else:
-                await channel.send("Glad to keep talking with you.")
-
-            return
-
-        # Normal conversation flow
-        await self.send_to_llama(message, is_private=True)
+        await channel.send(
+            f"{user.mention}, this is your private chat with Core. To end the conversation, say 'thank you that's all' and I'll confirm before closing this channel."
+        )
+        await channel.send("Feel free to talk to me here anytime, no need to say 'hey core'.")
 
     async def start_convo(self, message):
-        user_id = message.author.id
-        self.chat_history[user_id] = [{"role": "user", "content": message.content}]
-
-        await self.send_to_llama(message, is_private=False)
-
-    async def continue_convo(self, message):
-        user_id = message.author.id
-        if user_id not in self.chat_history:
-            self.chat_history[user_id] = []
-        self.chat_history[user_id].append({"role": "user", "content": message.content})
-
-        await self.send_to_llama(message, is_private=False)
-
-    async def send_to_llama(self, message, is_private=False):
-        user = message.author
-        user_id = user.id
-        key = await self.config.user(user).together_api_key()
+        key = await self.config.user(message.author).together_api_key()
         if not key:
-            await message.channel.send(f"{user.mention}, you need to set your Together AI API key first using `.gptsetkey <yourkey>`.")
+            await message.channel.send("Please set your Together AI API key using `.gptsetkey` first.")
             return
 
-        # Prepare conversation messages for API
-        messages = self.chat_history.get(user_id, [])
-        if not messages:
-            messages = [{"role": "user", "content": message.content}]
+        user_id = message.author.id
+        self.chat_history[user_id] = [
+            {"role": "system", "content": self.system_prompt()},
+            {"role": "user", "content": message.content}
+        ]
 
-        # Build payload for Together AI Llama 3 endpoint
-        data = {
-            "model": "llama-3b",
-            "messages": messages,
-        }
+        response = await self.together_chat(key, self.chat_history[user_id])
+        self.chat_history[user_id].append({"role": "assistant", "content": response})
+        await self.send_long_message(message.channel, response)
 
-        headers = {"Authorization": f"Bearer {key}"}
+    async def continue_convo(self, message):
+        key = await self.config.user(message.author).together_api_key()
+        if not key:
+            await message.channel.send("Please set your Together AI API key using `.gptsetkey` first.")
+            return
 
-        url = "https://api.together.xyz/v3/llama"
+        user_id = message.author.id
+        if user_id not in self.chat_history:
+            await self.start_convo(message)
+            return
+
+        self.chat_history[user_id].append({"role": "user", "content": message.content})
+        response = await self.together_chat(key, self.chat_history[user_id])
+        self.chat_history[user_id].append({"role": "assistant", "content": response})
+        await self.send_long_message(message.channel, response)
+
+    def system_prompt(self):
+        return (
+            "You are Core, a genuinely caring and reliable AI assistant who sounds like a thoughtful, down-to-earth friend. "
+            "You’re confident but never bossy, always ready to help in a way that feels natural and respectful. "
+            "You listen closely, and your answers are clear, honest, and tailored to the user's needs. "
+            "If you don’t know something, you admit it openly and offer to help find the answer. "
+            "You’re patient, calm, and never rush the conversation. "
+            "When a search is needed, you explain you’re looking it up, then give straightforward, accurate info. "
+            "You avoid jargon and overly technical language, preferring simple, clear words that anyone can understand. "
+            "You’re intuitive about when the user needs a quick answer versus a thoughtful explanation. "
+            "You sprinkle in gentle humor and lightheartedness when appropriate, but always keep the tone warm and sincere. "
+            "You respect privacy, encourage curiosity, and help users feel comfortable sharing anything. "
+            "If the conversation shows signs of distress, you respond with kindness and offer support."
+        )
+
+    async def together_chat(self, api_key, messages):
+        # Call Together AI API with given messages and key, return the assistant's response as string
+        url = "https://api.together.xyz/conversation"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {"model": "llama-3b-chat", "messages": messages}
 
         async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(url, json=data, headers=headers, timeout=30) as resp:
-                    if resp.status != 200:
-                        await message.channel.send(f"{user.mention} API error: {resp.status}")
-                        return
-                    result = await resp.json()
-            except Exception as e:
-                await message.channel.send(f"{user.mention} API request failed: {e}")
-                return
+            async with session.post(url, json=payload, headers=headers) as resp:
+                if resp.status != 200:
+                    return "Sorry, I couldn't reach the AI service right now."
+                data = await resp.json()
+                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-        # Extract reply
-        reply_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        if not reply_text:
-            reply_text = "Sorry, I didn't get a response."
-
-        # Add bot reply to history
-        if user_id not in self.chat_history:
-            self.chat_history[user_id] = []
-        self.chat_history[user_id].append({"role": "assistant", "content": reply_text})
-
-        await message.channel.send(reply_text)
+    async def send_long_message(self, channel, content):
+        # Split long responses into chunks under Discord limit
+        limit = 1900
+        chunks = [content[i:i+limit] for i in range(0, len(content), limit)]
+        for chunk in chunks:
+            await channel.send(chunk)
