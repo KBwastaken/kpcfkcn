@@ -31,15 +31,17 @@ class CheckBan(commands.Cog):
         if not await self.has_team_role(interaction):
             return await interaction.response.send_message("Authorised role not found", ephemeral=True)
 
+        await interaction.response.defer(ephemeral=True)  # ✅ prevents 3s timeout
+
         banned_servers = []
 
         for guild in self.bot.guilds:
             try:
-                async for ban_entry in guild.bans():  # <-- FIXED THIS LINE
+                async for ban_entry in guild.bans():  # ✅ proper usage
                     if ban_entry.user.id == user.id:
                         banned_servers.append((guild.name, ban_entry.reason))
             except discord.Forbidden:
-                continue  # no perms to view bans
+                continue  # bot can't access bans in this guild
 
         if banned_servers:
             msg = f"**{user}** is banned in the following server(s):\n"
@@ -49,4 +51,4 @@ class CheckBan(commands.Cog):
         else:
             msg = f"**{user}** is not banned in any servers I can check."
 
-        await interaction.response.send_message(msg)
+        await interaction.followup.send(msg, ephemeral=True)  # ✅ now we edit response properly
