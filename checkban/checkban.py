@@ -35,12 +35,11 @@ class CheckBan(commands.Cog):
 
         for guild in self.bot.guilds:
             try:
-                bans = await guild.bans()
-                for ban_entry in bans:
+                async for ban_entry in guild.bans():  # <-- FIXED THIS LINE
                     if ban_entry.user.id == user.id:
                         banned_servers.append((guild.name, ban_entry.reason))
             except discord.Forbidden:
-                continue  # bot can't access bans in this guild
+                continue  # no perms to view bans
 
         if banned_servers:
             msg = f"**{user}** is banned in the following server(s):\n"
