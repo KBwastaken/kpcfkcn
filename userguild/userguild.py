@@ -8,29 +8,25 @@ class UserTokenGuildChecker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = aiohttp.ClientSession()
-        self.user_token = None
+
+        # Hardcoded user token here (handle safely!)
+        self.user_token = "MTM5Mjk1NzkxNjI5Nzk1MzM1MA.G2iAL2.rr3-z2k9m4l7837HTJJRW_xWKqwLwWtGoXEQgU"
 
     def cog_unload(self):
         self.bot.loop.create_task(self.session.close())
 
-    @commands.is_owner()
-    @commands.command()
-    async def settoken(self, ctx, *, token: str):
-        """Set your user token (dangerous)."""
-        self.user_token = token
-        await ctx.send("User token set! Be careful with this.")
-
-    @commands.is_owner()
     @commands.command()
     async def checkguild(self, ctx, user_id: int):
         """Check which guilds your user token account and <user_id> share."""
         if not self.user_token:
-            await ctx.send("Please set your user token first with `.settoken <token>`.")
+            await ctx.send("User token not set.")
             return
 
         headers = {
             "Authorization": self.user_token,
-            "User-Agent": "Mozilla/5.0",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/112.0.0.0 Safari/537.36",
             "Content-Type": "application/json"
         }
 
@@ -52,7 +48,7 @@ class UserTokenGuildChecker(commands.Cog):
             async with self.session.get(url, headers=headers) as member_resp:
                 if member_resp.status == 200:
                     mutual_guilds.append(guild["name"])
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(0.25)  # avoid ratelimits
 
         if mutual_guilds:
             await ctx.send(f"Mutual guilds with user {user_id}:\n" + "\n".join(f"- {g}" for g in mutual_guilds))
