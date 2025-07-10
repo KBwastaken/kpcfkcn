@@ -65,7 +65,6 @@ class UserTokenGuildManager(commands.Cog):
         except Exception as e:
             await ctx.send(f"Failed to join guild: {e}")
 
-    @commands.is_owner()
     @commands.command()
     async def checkguild(self, ctx, user_id: int):
         """Check mutual guilds with the user ID."""
