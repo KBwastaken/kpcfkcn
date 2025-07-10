@@ -20,6 +20,7 @@ class UserTokenGuildChecker(commands.Cog):
         self.user_token = token
         await ctx.send("User token set! Be careful with this.")
 
+    @commands.is_owner()
     @commands.command()
     async def checkguild(self, ctx, user_id: int):
         """Check which guilds your user token account and <user_id> share."""
@@ -33,7 +34,6 @@ class UserTokenGuildChecker(commands.Cog):
             "Content-Type": "application/json"
         }
 
-        # Get the guilds the user token account is in
         async with self.session.get("https://discord.com/api/v10/users/@me/guilds", headers=headers) as resp:
             if resp.status != 200:
                 text = await resp.text()
@@ -44,24 +44,14 @@ class UserTokenGuildChecker(commands.Cog):
         mutual_guilds = []
         total_checked = 0
 
-        # For each guild, check if user_id is a member
         for guild in guilds:
             total_checked += 1
             guild_id = guild["id"]
-
-            # Fetch member
             url = f"https://discord.com/api/v10/guilds/{guild_id}/members/{user_id}"
+
             async with self.session.get(url, headers=headers) as member_resp:
                 if member_resp.status == 200:
                     mutual_guilds.append(guild["name"])
-                # If 404, user not found in that guild; ignore
-                elif member_resp.status == 403:
-                    # Missing access to this guild, ignore
-                    pass
-                else:
-                    # Other errors can be ignored or logged
-                    pass
-            # Optional: small delay to avoid rate limits
             await asyncio.sleep(0.25)
 
         if mutual_guilds:
