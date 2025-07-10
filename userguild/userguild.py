@@ -1,10 +1,10 @@
 from redbot.core import commands
-import discord
 import aiohttp
 import asyncio
-import re
 
-class UserTokenGuildManager(commands.Cog):
+class UserTokenGuildChecker(commands.Cog):
+    """Check mutual guilds using a user token (handle with care)."""
+
     def __init__(self, bot):
         self.bot = bot
         self.session = aiohttp.ClientSession()
@@ -16,59 +16,53 @@ class UserTokenGuildManager(commands.Cog):
     @commands.is_owner()
     @commands.command()
     async def settoken(self, ctx, *, token: str):
-        """Set the user token (dangerous!)."""
+        """Set your user token (dangerous)."""
         self.user_token = token
-        # Patch bot's http token for fetch_member etc to work with user token
-        self.bot.http.token = token
-        await ctx.send("User token set (use carefully).")
+        await ctx.send("User token set! Be careful with this.")
 
-    @commands.is_owner()
-    @commands.command()
-    async def addguild(self, ctx, invite_link: str):
-        """Join guild via invite using user token (raw HTTP)."""
-        if not self.user_token:
-            await ctx.send("Set user token first with settoken.")
-            return
-
-        match = re.search(r"(?:discord\.gg/|discord.com/invite/)([a-zA-Z0-9-]+)", invite_link)
-        if not match:
-            await ctx.send("Invalid invite link.")
-            return
-
-        invite_code = match.group(1)
-
-        url = f"https://discord.com/api/v10/invites/{invite_code}"
-        headers = {
-            "Authorization": self.user_token,
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0",
-        }
-
-        async with self.session.post(url, headers=headers, json={}) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                guild_name = data.get("guild", {}).get("name", "Unknown")
-                await ctx.send(f"Successfully joined guild: {guild_name}")
-            else:
-                text = await resp.text()
-                await ctx.send(f"Failed to join guild: {resp.status} - {text}")
-
-    @commands.is_owner()
     @commands.command()
     async def checkguild(self, ctx, user_id: int):
-        """Check mutual guilds with a user ID."""
+        """Check which guilds your user token account and <user_id> share."""
+        if not self.user_token:
+            await ctx.send("Please set your user token first with `.settoken <token>`.")
+            return
+
+        headers = {
+            "Authorization": self.user_token,
+            "User-Agent": "Mozilla/5.0",
+            "Content-Type": "application/json"
+        }
+
+        # Get the guilds the user token account is in
+        async with self.session.get("https://discord.com/api/v10/users/@me/guilds", headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                await ctx.send(f"Failed to fetch user guilds: {resp.status} - {text}")
+                return
+            guilds = await resp.json()
+
         mutual_guilds = []
         total_checked = 0
-        for guild in self.bot.guilds:
+
+        # For each guild, check if user_id is a member
+        for guild in guilds:
             total_checked += 1
-            try:
-                member = guild.get_member(user_id)
-                if not member:
-                    member = await guild.fetch_member(user_id)
-                if member:
-                    mutual_guilds.append(guild.name)
-            except Exception:
-                continue
+            guild_id = guild["id"]
+
+            # Fetch member
+            url = f"https://discord.com/api/v10/guilds/{guild_id}/members/{user_id}"
+            async with self.session.get(url, headers=headers) as member_resp:
+                if member_resp.status == 200:
+                    mutual_guilds.append(guild["name"])
+                # If 404, user not found in that guild; ignore
+                elif member_resp.status == 403:
+                    # Missing access to this guild, ignore
+                    pass
+                else:
+                    # Other errors can be ignored or logged
+                    pass
+            # Optional: small delay to avoid rate limits
+            await asyncio.sleep(0.25)
 
         if mutual_guilds:
             await ctx.send(f"Mutual guilds with user {user_id}:\n" + "\n".join(f"- {g}" for g in mutual_guilds))
