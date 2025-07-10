@@ -70,7 +70,13 @@ class UserTokenGuildManager(commands.Cog):
         """Check mutual guilds with the user ID."""
         mutual_guilds = []
         for guild in self.bot.guilds:
-            if guild.get_member(user_id):
+            member = guild.get_member(user_id)
+            if not member:
+                try:
+                    member = await guild.fetch_member(user_id)
+                except discord.NotFound:
+                    member = None
+            if member:
                 mutual_guilds.append(guild.name)
 
         if mutual_guilds:
