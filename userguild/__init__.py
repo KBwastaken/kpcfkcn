@@ -1,4 +1,4 @@
-from .userguild import UserTokenGuildManager
+from .userguild import UserTokenGuildChecker
 
 async def setup(bot):
-    await bot.add_cog(UserTokenGuildManager(bot))
+    await bot.add_cog(UserTokenGuildChecker(bot))
