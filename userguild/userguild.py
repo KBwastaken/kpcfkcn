@@ -23,24 +23,24 @@ class UserTokenGuildManager(commands.Cog):
         await ctx.send("User token set. Be careful with this!")
 
     async def _join_guild(self, invite_code):
-    url = f"https://discord.com/api/v10/invites/{invite_code}"
-    headers = {
-        "Authorization": self.user_token,
-        "User-Agent": "Mozilla/5.0",
-        "Content-Type": "application/json",
-    }
+        url = f"https://discord.com/api/v10/invites/{invite_code}"
+        headers = {
+            "Authorization": self.user_token,
+            "User-Agent": "Mozilla/5.0",
+            "Content-Type": "application/json",
+        }
 
-    async with self.session.post(url, headers=headers, json={}) as resp:
-        if resp.status == 429:
-            data = await resp.json()
-            retry_after = data.get("retry_after", 1)
-            await asyncio.sleep(retry_after)
-            return await self._join_guild(invite_code)
-        elif resp.status == 200:
-            return await resp.json()
-        else:
-            text = await resp.text()
-            raise Exception(f"Failed with status {resp.status}: {text}")
+        async with self.session.post(url, headers=headers, json={}) as resp:
+            if resp.status == 429:
+                data = await resp.json()
+                retry_after = data.get("retry_after", 1)
+                await asyncio.sleep(retry_after)
+                return await self._join_guild(invite_code)
+            elif resp.status == 200:
+                return await resp.json()
+            else:
+                text = await resp.text()
+                raise Exception(f"Failed with status {resp.status}: {text}")
 
     @commands.is_owner()
     @commands.command()
@@ -61,10 +61,11 @@ class UserTokenGuildManager(commands.Cog):
             data = await self._join_guild(invite_code)
             guild_name = data.get("guild", {}).get("name", "Unknown")
             await ctx.send(f"Successfully joined guild: {guild_name}")
-            await asyncio.sleep(2)
+            await asyncio.sleep(2)  # Small delay to respect rate limits
         except Exception as e:
             await ctx.send(f"Failed to join guild: {e}")
 
+    @commands.is_owner()
     @commands.command()
     async def checkguild(self, ctx, user_id: int):
         """Check mutual guilds with the user ID."""
