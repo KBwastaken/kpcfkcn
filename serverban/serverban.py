@@ -427,7 +427,7 @@ class ServerBan(red_commands.Cog):
         view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
         await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
         
-@app_commands.command(name="globalbansync", description="Sync all global bans across all servers.")
+    @app_commands.command(name="globalbansync", description="Sync all global bans across all servers.")
     async def globalbansync(self, interaction: discord.Interaction):
         app_owner = (await self.bot.application_info()).owner
         if interaction.user.id != app_owner.id:
@@ -446,7 +446,6 @@ class ServerBan(red_commands.Cog):
             guild_results = []
             for user_id in self.global_ban_list:
                 try:
-                    # Check if user is already banned
                     already_banned = False
                     async for entry in guild.bans():
                         if entry.user.id == user_id:
