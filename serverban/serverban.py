@@ -492,7 +492,7 @@ class ServerBan(red_commands.Cog):
             return embed
 
         embed = await build_embed()
-        msg = await interaction.response.send_message(embed=embed, ephemeral=True)
+        msg = await interaction.response.send_message(embed=embed, ephemeral=False)
         msg = await msg.original_response()
 
         while not msg._state.is_closed():
