@@ -401,28 +401,25 @@ async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optio
             )
             return embed
 
-        async def prev_page(self, interaction):
+        async def prev_page(self, interaction: discord.Interaction):
             if interaction.user != self.user:
                 return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
             self.current_page -= 1
-            await self.update_message(interaction)
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_current_embed(), view=self)
 
-        async def next_page(self, interaction):
+        async def next_page(self, interaction: discord.Interaction):
             if interaction.user != self.user:
                 return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
             self.current_page += 1
-            await self.update_message(interaction)
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_current_embed(), view=self)
 
-        async def stop(self, interaction):
+        async def stop(self, interaction: discord.Interaction):
             if interaction.user != self.user:
                 return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
             await interaction.message.delete()
-            self.stop()
-
-        async def update_message(self, interaction):
-            embed = self.get_current_embed()
-            self.update_buttons()
-            await interaction.response.edit_message(embed=embed, view=self)
+            self.stop()  # This line should be removed to avoid recursion
 
     view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
     await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
