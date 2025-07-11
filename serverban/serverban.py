@@ -378,7 +378,7 @@ async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optio
 
             self.prev_button.callback = self.prev_page
             self.next_button.callback = self.next_page
-            self.stop_button.callback = self.stop
+            self.stop_button.callback = self.stop_callback  # fixed callback name
 
             self.update_buttons()
 
@@ -413,11 +413,11 @@ async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optio
             self.current_page += 1
             await self.update_message(interaction)
 
-        async def stop(self, interaction: discord.Interaction):
+        async def stop_callback(self, interaction: discord.Interaction):
             if interaction.user != self.user:
                 return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
             await interaction.message.delete()
-            self.stop()
+            super().stop()  # properly stop the view
 
         async def update_message(self, interaction):
             embed = self.get_current_embed()
