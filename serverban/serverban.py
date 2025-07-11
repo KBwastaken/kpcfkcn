@@ -480,8 +480,9 @@ class ServerBan(red_commands.Cog):
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
             
+
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 10s).")
-async def globalbanstats(self, interaction: discord.Interaction):
+async def globalbanstats(self, interaction):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(embed=self._error_embed("Unauthorized"), ephemeral=True)
 
@@ -502,9 +503,8 @@ async def globalbanstats(self, interaction: discord.Interaction):
     while True:
         await asyncio.sleep(10)
         try:
-            new_embed = await build_embed()
-            await msg.edit(embed=new_embed)
+            await msg.edit(embed=await build_embed())
         except (discord.NotFound, discord.Forbidden):
-            break  # message deleted or bot lost access
+            break  # message deleted or can't edit
         except Exception:
-            continue  # something else went wrong but don't cra
+            continue  # ignore other issues and keep going
