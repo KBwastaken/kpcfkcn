@@ -477,3 +477,28 @@ class ServerBan(red_commands.Cog):
                 color=discord.Color.orange()
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
+            
+    @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 10s).")
+    async def globalbanstats(self, interaction):
+        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+            return await interaction.response.send_message(embed=self._error_embed("Unauthorized"), ephemeral=True)
+
+        async def build_embed():
+            total_bans = len(self.global_ban_list)
+            synced_servers = sum(1 for g in self.bot.guilds if g.id not in self.server_blacklist)
+            embed = discord.Embed(title="🔒 Global Ban Stats", color=discord.Color.blue())
+            embed.add_field(name="Total globally banned users", value=str(total_bans), inline=False)
+            embed.add_field(name="Servers with bans synced", value=str(synced_servers), inline=False)
+            return embed
+
+        embed = await build_embed()
+        msg = await interaction.response.send_message(embed=embed, ephemeral=True)
+        msg = await msg.original_response()
+
+        while not msg._state.is_closed():
+            await asyncio.sleep(10)
+            new_embed = await build_embed()
+            try:
+                await msg.edit(embed=new_embed)
+            except Exception:
+                break
