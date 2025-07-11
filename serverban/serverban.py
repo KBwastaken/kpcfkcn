@@ -482,7 +482,7 @@ class ServerBan(red_commands.Cog):
             
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 10s).")
-async def globalbanstats (self, interaction:)
+async def globalbanstats (self, interaction):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(embed=self._error_embed("Unauthorized"), ephemeral=True)
 
