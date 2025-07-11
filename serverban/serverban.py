@@ -345,40 +345,84 @@ class ServerBan(red_commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
-    @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
-    async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optional[bool] = True):
-        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(
-                embed=self._error_embed("You are not authorized to use this command."),
-                ephemeral=True
-            )
+@app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
+@app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
+async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optional[bool] = True):
+    if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+        return await interaction.response.send_message(
+            embed=self._error_embed("You are not authorized to use this command."),
+            ephemeral=True
+        )
 
-        if not self.global_ban_list:
-            return await interaction.response.send_message(
-                embed=self._success_embed("The global ban list is currently empty."),
-                ephemeral=True
-            )
+    if not self.global_ban_list:
+        return await interaction.response.send_message(
+            embed=self._success_embed("The global ban list is currently empty."),
+            ephemeral=True
+        )
 
-        lines = [f"<@{user_id}> `{user_id}`" for user_id in self.global_ban_list]
+    entries = [f"<@{user_id}> `{user_id}`" for user_id in self.global_ban_list]
 
-        chunk_size = 1900
-        description_chunks = []
-        current_chunk = ""
-        for line in lines:
-            if len(current_chunk) + len(line) + 1 > chunk_size:
-                description_chunks.append(current_chunk)
-                current_chunk = ""
-            current_chunk += line + "\n"
-        if current_chunk:
-            description_chunks.append(current_chunk)
+    class BanListView(discord.ui.View):
+        def __init__(self, entries, per_page, user, ephemeral):
+            super().__init__(timeout=300)
+            self.entries = entries
+            self.per_page = per_page
+            self.user = user
+            self.ephemeral = ephemeral
+            self.current_page = 0
+            self.total_pages = (len(entries) - 1) // per_page + 1
 
-        await interaction.response.defer(ephemeral=ephemeral)
+            self.prev_button = discord.ui.Button(label="⬅ Previous", style=discord.ButtonStyle.secondary)
+            self.next_button = discord.ui.Button(label="Next ➡", style=discord.ButtonStyle.secondary)
+            self.stop_button = discord.ui.Button(label="❌ Close", style=discord.ButtonStyle.danger)
 
-        for i, desc in enumerate(description_chunks):
+            self.prev_button.callback = self.prev_page
+            self.next_button.callback = self.next_page
+            self.stop_button.callback = self.stop
+
+            self.update_buttons()
+
+            self.add_item(self.prev_button)
+            self.add_item(self.next_button)
+            self.add_item(self.stop_button)
+
+        def update_buttons(self):
+            self.prev_button.disabled = self.current_page == 0
+            self.next_button.disabled = self.current_page >= self.total_pages - 1
+
+        def get_current_embed(self):
+            start = self.current_page * self.per_page
+            end = start + self.per_page
+            page_entries = self.entries[start:end]
             embed = discord.Embed(
-                title=f"Global Ban List{' (Part '+str(i+1)+')' if len(description_chunks) > 1 else ''}",
-                description=desc,
+                title=f"Global Ban List (Page {self.current_page + 1} of {self.total_pages})",
+                description="\n".join(page_entries),
                 color=discord.Color.orange()
             )
-            await interaction.followup.send(embed=embed, ephemeral=ephemeral)
+            return embed
+
+        async def prev_page(self, interaction: discord.Interaction):
+            if interaction.user != self.user:
+                return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
+            self.current_page -= 1
+            await self.update_message(interaction)
+
+        async def next_page(self, interaction: discord.Interaction):
+            if interaction.user != self.user:
+                return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
+            self.current_page += 1
+            await self.update_message(interaction)
+
+        async def stop(self, interaction: discord.Interaction):
+            if interaction.user != self.user:
+                return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
+            await interaction.message.delete()
+            self.stop()
+
+        async def update_message(self, interaction):
+            embed = self.get_current_embed()
+            self.update_buttons()
+            await interaction.response.edit_message(embed=embed, view=self)
+
+    view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
+    await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
