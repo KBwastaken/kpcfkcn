@@ -345,7 +345,7 @@ class ServerBan(red_commands.Cog):
             ephemeral=True
         )
 
- @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
+@app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
 @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
 async def globalbanlist(self, interaction, ephemeral: Optional[bool] = True):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
