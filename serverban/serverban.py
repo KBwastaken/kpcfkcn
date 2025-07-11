@@ -345,84 +345,84 @@ class ServerBan(red_commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
-    @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
-    async def globalbanlist(self, interaction, ephemeral: Optional[bool] = True):
-        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(
-                embed=self._error_embed("You are not authorized to use this command."),
-                ephemeral=True
+ @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
+@app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
+async def globalbanlist(self, interaction, ephemeral: Optional[bool] = True):
+    if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+        return await interaction.response.send_message(
+            embed=self._error_embed("You are not authorized to use this command."),
+            ephemeral=True
+        )
+
+    if not self.global_ban_list:
+        return await interaction.response.send_message(
+            embed=self._success_embed("The global ban list is currently empty."),
+            ephemeral=True
+        )
+
+    entries = [f"<@{user_id}> `{user_id}`" for user_id in self.global_ban_list]
+
+    class BanListView(discord.ui.View):
+        def __init__(self, entries, per_page, user, ephemeral):
+            super().__init__(timeout=300)
+            self.entries = entries
+            self.per_page = per_page
+            self.user = user
+            self.ephemeral = ephemeral
+            self.current_page = 0
+            self.total_pages = (len(entries) - 1) // per_page + 1
+
+            self.prev_button = discord.ui.Button(label="⬅ Previous", style=discord.ButtonStyle.secondary)
+            self.next_button = discord.ui.Button(label="Next ➡", style=discord.ButtonStyle.secondary)
+            self.stop_button = discord.ui.Button(label="❌ Close", style=discord.ButtonStyle.danger)
+
+            self.prev_button.callback = self.prev_page
+            self.next_button.callback = self.next_page
+            self.stop_button.callback = self.stop
+
+            self.update_buttons()
+
+            self.add_item(self.prev_button)
+            self.add_item(self.next_button)
+            self.add_item(self.stop_button)
+
+        def update_buttons(self):
+            self.prev_button.disabled = self.current_page == 0
+            self.next_button.disabled = self.current_page >= self.total_pages - 1
+
+        def get_current_embed(self):
+            start = self.current_page * self.per_page
+            end = start + self.per_page
+            page_entries = self.entries[start:end]
+            embed = discord.Embed(
+                title=f"Global Ban List (Page {self.current_page + 1} of {self.total_pages})",
+                description="\n".join(page_entries),
+                color=discord.Color.orange()
             )
+            return embed
 
-        if not self.global_ban_list:
-            return await interaction.response.send_message(
-                embed=self._success_embed("The global ban list is currently empty."),
-                ephemeral=True
-            )
+        async def prev_page(self, interaction):
+            if interaction.user != self.user:
+                return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
+            self.current_page -= 1
+            await self.update_message(interaction)
 
-        entries = [f"<@{user_id}> `{user_id}`" for user_id in self.global_ban_list]
+        async def next_page(self, interaction):
+            if interaction.user != self.user:
+                return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
+            self.current_page += 1
+            await self.update_message(interaction)
 
-        class BanListView(discord.ui.View):
-            def __init__(self, entries, per_page, user, ephemeral):
-                super().__init__(timeout=300)
-                self.entries = entries
-                self.per_page = per_page
-                self.user = user
-                self.ephemeral = ephemeral
-                self.current_page = 0
-                self.total_pages = (len(entries) - 1) // per_page + 1
+        async def stop(self, interaction):
+            if interaction.user != self.user:
+                return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
+            await interaction.message.delete()
+            self.stop()
 
-                self.prev_button = discord.ui.Button(label="⬅ Previous", style=discord.ButtonStyle.secondary)
-                self.next_button = discord.ui.Button(label="Next ➡", style=discord.ButtonStyle.secondary)
-                self.stop_button = discord.ui.Button(label="❌ Close", style=discord.ButtonStyle.danger)
+        async def update_message(self, interaction):
+            embed = self.get_current_embed()
+            self.update_buttons()
+            await interaction.response.edit_message(embed=embed, view=self)
 
-                self.prev_button.callback = self.prev_page
-                self.next_button.callback = self.next_page
-                self.stop_button.callback = self.stop
-
-                self.update_buttons()
-
-                self.add_item(self.prev_button)
-                self.add_item(self.next_button)
-                self.add_item(self.stop_button)
-
-            def update_buttons(self):
-                self.prev_button.disabled = self.current_page == 0
-                self.next_button.disabled = self.current_page >= self.total_pages - 1
-
-            def get_current_embed(self):
-                start = self.current_page * self.per_page
-                end = start + self.per_page
-                page_entries = self.entries[start:end]
-                embed = discord.Embed(
-                    title=f"Global Ban List (Page {self.current_page + 1} of {self.total_pages})",
-                    description="\n".join(page_entries),
-                    color=discord.Color.orange()
-                )
-                return embed
-
-            async def prev_page(self, interaction):
-                if interaction.user != self.user:
-                    return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
-                self.current_page -= 1
-                await self.update_message(interaction)
-
-            async def next_page(self, interaction):
-                if interaction.user != self.user:
-                    return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
-                self.current_page += 1
-                await self.update_message(interaction)
-
-            async def stop(self, interaction):
-                if interaction.user != self.user:
-                    return await interaction.response.send_message("You can’t use these buttons.", ephemeral=True)
-                await interaction.message.delete()
-                self.stop()
-
-            async def update_message(self, interaction):
-                embed = self.get_current_embed()
-                self.update_buttons()
-                await interaction.response.edit_message(embed=embed, view=self)
-
-        view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
-        await interaction.response.send_message(embed=view.get_current_embed(), view=view,
+    view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
+    await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
