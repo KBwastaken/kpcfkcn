@@ -430,8 +430,8 @@ class ServerBan(red_commands.Cog):
         view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
         await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
         
-    @app_commands.command(name="globalbansync", description="Sync all global bans across all servers.")
-    async def globalbansync(self, interaction, ephemeral: Optional[bool] = True):
+@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
+async def globalbanstats(self, interaction: discord.Interaction):  # Fully qualified type
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(
                 embed=self._error_embed("Only the bot owner can run this command."),
