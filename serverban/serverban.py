@@ -483,10 +483,11 @@ class ServerBan(red_commands.Cog):
             
 
 
-    @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-    async def globalbanstats(self, interaction):  # <-- No type annotation here
-            await self.bot.wait_until_ready()
-            
+@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
+async def globalbanstats(self, interaction):  # No type annotation, that's okay
+
+    await self.bot.wait_until_ready()
+
     # Permissions check
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         embed = discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red())
@@ -534,8 +535,8 @@ class ServerBan(red_commands.Cog):
             asyncio.wait_for(fetch_bans(guild), timeout=5)
             for guild in self.bot.guilds
         ]
-        ban_counts = await asyncio.gather(*tasks)
-        total_normal_bans = sum(ban_counts)
+        ban_counts = await asyncio.gather(*tasks, return_exceptions=True)
+        total_normal_bans = sum(count if isinstance(count, int) else 0 for count in ban_counts)
 
         total_global_bans = len(self.global_ban_list)
         total_servers = len(self.bot.guilds)
