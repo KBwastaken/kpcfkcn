@@ -485,7 +485,7 @@ class ServerBan(red_commands.Cog):
 
     @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
     async def globalbanstats(self, interaction: discord.Interaction):
-        if interaction.user.id not in self.ALLOWED_GLOBAL_IDS:
+        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             embed = discord.Embed(
                 title="Unauthorized",
                 description="You cannot use this command.",
