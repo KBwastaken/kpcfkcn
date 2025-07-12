@@ -485,6 +485,7 @@ async def globalbanstats(self, interaction: discord.Interaction):  # Fully quali
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
 async def globalbanstats(self, interaction: discord.Interaction):
+    # your code here...
     # Verify user permissions
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         embed = discord.Embed(
