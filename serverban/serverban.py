@@ -431,7 +431,6 @@ class ServerBan(red_commands.Cog):
         await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
         
 
-
 @app_commands.command(name="globalbansync", description="syncs all bans globally.")
 async def globalbansync(self, interaction: discord.Interaction):  # Fully qualified type
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
