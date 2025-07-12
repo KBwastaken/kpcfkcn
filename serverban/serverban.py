@@ -482,39 +482,32 @@ class ServerBan(red_commands.Cog):
             
 
 
-@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
+@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 10s).")
 async def globalbanstats(self, interaction: "discord.Interaction"):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(
-            embed=discord.Embed(
-                title="Unauthorized",
-                description="You cannot use this command.",
-                color=discord.Color.red()
-            ),
+            embed=discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red()),
             ephemeral=True
         )
 
     async def build_embed():
-        total_global_bans = len(self.global_ban_list)
-        total_bans = 0
-        total_members = 0
-        total_servers = len(self.bot.guilds)
+        total_bans = len(self.global_ban_list)
+        synced_servers = sum(1 for g in self.bot.guilds if g.id not in self.server_blacklist)
+        total_server_bans = 0
 
         for guild in self.bot.guilds:
             try:
-                total_members += guild.member_count or 0
                 bans = await guild.bans()
-                total_bans += len(bans)
+                total_server_bans += len(bans)
             except Exception:
-                continue  # skip if we can't access bans
+                continue  # skip guilds we can't access
 
         updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
         embed = discord.Embed(title="🔒 Global Ban Stats", color=discord.Color.blue())
-        embed.add_field(name="Total globally banned users", value=str(total_global_bans), inline=False)
-        embed.add_field(name="Total bans across all servers", value=str(total_bans), inline=False)
-        embed.add_field(name="Total members across all servers", value=str(total_members), inline=False)
-        embed.add_field(name="Total servers", value=str(total_servers), inline=False)
+        embed.add_field(name="Total globally banned users", value=str(total_bans), inline=False)
+        embed.add_field(name="Servers with bans synced", value=str(synced_servers), inline=False)
+        embed.add_field(name="Total bans across all servers", value=str(total_server_bans), inline=False)
         embed.set_footer(text=f"Last updated: {updated_at}")
         return embed
 
@@ -522,7 +515,7 @@ async def globalbanstats(self, interaction: "discord.Interaction"):
     msg = await interaction.original_response()
 
     while True:
-        await asyncio.sleep(900)  # refresh every 15 minutes
+        await asyncio.sleep(900)
         try:
             await msg.edit(embed=await build_embed())
         except (discord.NotFound, discord.Forbidden):
