@@ -552,9 +552,3 @@ class ServerBan(red_commands.Cog):
                 break
             except Exception:
                 continue
-
-    async def cog_load(self):
-        self.bot.tree.add_command(self.globalbanstats)
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(BanStats(bot))
