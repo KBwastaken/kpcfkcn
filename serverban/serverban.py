@@ -514,8 +514,3 @@ class ServerBan(red_commands.Cog):
                 break
             except Exception:
                 continue
-
-    async def cog_app_command_group(self) -> app_commands.Group:
-        group = app_commands.Group(name="serverban", description="ServerBan Commands")
-        group.add_command(self.globalbanstats)
-        return
