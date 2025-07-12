@@ -482,7 +482,7 @@ class ServerBan(red_commands.Cog):
             
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction: Interaction):
+async def globalbanstats(self, interaction: "Interaction"):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(
             embed=discord.Embed(
@@ -505,7 +505,7 @@ async def globalbanstats(self, interaction: Interaction):
                 bans = await guild.bans()
                 total_bans += len(bans)
             except Exception:
-                continue  # Skip guilds without permission
+                continue
 
         updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
