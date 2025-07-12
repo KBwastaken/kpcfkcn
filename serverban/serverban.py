@@ -483,11 +483,9 @@ async def globalbanstats(self, interaction: discord.Interaction):  # Fully quali
             
 
 
-from discord import Interaction
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction: Interaction):  # ✅ Annotated properly
-    await self.bot.wait_until_ready()
+async def globalbanstats(self, interaction):  # ✅ Annotated properly
 
     # Permissions check
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
