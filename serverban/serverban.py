@@ -499,18 +499,20 @@ class ServerBan(red_commands.Cog):
                 pass
             del self.active_messages[guild_id]
 
-        async def build_embed():
-            total_normal_bans = 0
-            for guild in self.bot.guilds:
-                if guild.id in self.server_blacklist:
-                    continue
-                try:
-                    bans = await guild.bans()
-                    total_normal_bans += len(bans)
-                except discord.Forbidden:
-                    continue
-                except Exception:
-                    continue
+async def fetch_bans(guild):
+    if guild.id in self.server_blacklist:
+        return 0
+    try:
+        bans = await guild.bans()
+        return len(bans)
+    except discord.Forbidden:
+        return 0
+    except Exception as e:
+        print(f"Error fetching bans from {guild.name}: {e}")
+        return 0
+
+ban_counts = await asyncio.gather(*(fetch_bans(guild) for guild in self.bot.guilds))
+total_normal_bans = sum(ban_counts)
 
             total_global_bans = len(self.global_ban_list)
             total_servers = len(self.bot.guilds)
