@@ -483,14 +483,19 @@ class ServerBan(red_commands.Cog):
             
 
 
-@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction):  # No type annotation, that's okay
+from discord import Interaction
 
+@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
+async def globalbanstats(self, interaction: Interaction):  # ✅ Annotated properly
     await self.bot.wait_until_ready()
 
     # Permissions check
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-        embed = discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red())
+        embed = discord.Embed(
+            title="Unauthorized",
+            description="You cannot use this command.",
+            color=discord.Color.red()
+        )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     guild_id = interaction.guild_id
