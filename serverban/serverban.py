@@ -485,8 +485,7 @@ async def globalbanstats(self, interaction: discord.Interaction):  # Fully quali
 
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction):  # ✅ Annotated properly
-
+async def globalbanstats(self, interaction):
     # Permissions check
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         embed = discord.Embed(
@@ -504,9 +503,8 @@ async def globalbanstats(self, interaction):  # ✅ Annotated properly
             pass
         del self.active_messages[guild_id]
 
-    # Temporary "fetching" message with animated dots
     dots = [".", "..", "..."]
-    msg = await interaction.response.send_message("Fetching bans.", ephemeral=False)
+    await interaction.response.send_message("Fetching bans.", ephemeral=False)
     msg = await interaction.original_response()
 
     async def animate_loading():
@@ -516,7 +514,7 @@ async def globalbanstats(self, interaction):  # ✅ Annotated properly
                 await msg.edit(content=f"Fetching bans{dots[i % len(dots)]}")
                 i += 1
                 await asyncio.sleep(1)
-            except:
+            except Exception:
                 break
 
     loading_task = asyncio.create_task(animate_loading())
@@ -534,10 +532,7 @@ async def globalbanstats(self, interaction):  # ✅ Annotated properly
             return 0
 
     async def build_embed():
-        tasks = [
-            asyncio.wait_for(fetch_bans(guild), timeout=5)
-            for guild in self.bot.guilds
-        ]
+        tasks = [asyncio.wait_for(fetch_bans(guild), timeout=5) for guild in self.bot.guilds]
         ban_counts = await asyncio.gather(*tasks, return_exceptions=True)
         total_normal_bans = sum(count if isinstance(count, int) else 0 for count in ban_counts)
 
@@ -557,7 +552,6 @@ async def globalbanstats(self, interaction):  # ✅ Annotated properly
         embed.set_footer(text=f"Last updated: {updated_at}")
         return embed
 
-    # Replace loading text with actual stats
     try:
         embed = await build_embed()
         self.active_messages[guild_id] = msg
@@ -565,14 +559,13 @@ async def globalbanstats(self, interaction):  # ✅ Annotated properly
     finally:
         loading_task.cancel()
 
-    # Auto-update every 15 minutes
-while True:
-    await asyncio.sleep(900)
-    try:
-        embed = await build_embed()
-        await msg.edit(embed=embed)
-    except (discord.NotFound, discord.Forbidden):
-        self.active_messages.pop(guild_id, None)
-        break
-    except Exception:
-        continue
+    while True:
+        await asyncio.sleep(900)
+        try:
+            embed = await build_embed()
+            await msg.edit(embed=embed)
+        except (discord.NotFound, discord.Forbidden):
+            self.active_messages.pop(guild_id, None)
+            break
+        except Exception:
+            continue
