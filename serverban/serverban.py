@@ -484,8 +484,7 @@ class ServerBan(red_commands.Cog):
 
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction):
-    # Permissions check
+async def globalbanstats(self, interaction: discord.Interaction):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         embed = discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red())
         return await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -498,7 +497,6 @@ async def globalbanstats(self, interaction):
             pass
         del self.active_messages[guild_id]
 
-    # Step 1: Send temporary loading embed
     loading_embed = discord.Embed(
         title="Loading Global Ban Stats...",
         description="Fetching ban data. This may take a few seconds.",
@@ -507,7 +505,6 @@ async def globalbanstats(self, interaction):
     await interaction.response.send_message(embed=loading_embed, ephemeral=False)
     msg = await interaction.original_response()
 
-    # Fetch bans and build embed
     async def fetch_bans(guild):
         if guild.id in self.server_blacklist:
             return 0
@@ -540,11 +537,9 @@ async def globalbanstats(self, interaction):
         embed.set_footer(text=f"Last updated: {updated_at}")
         return embed
 
-    # Step 2: Edit the original message with the real stats
     await msg.edit(embed=await build_embed())
     self.active_messages[guild_id] = msg
 
-    # Step 3: Update every 15 minutes
     while True:
         await asyncio.sleep(900)
         try:
