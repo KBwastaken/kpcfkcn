@@ -566,13 +566,13 @@ async def globalbanstats(self, interaction):  # ✅ Annotated properly
         loading_task.cancel()
 
     # Auto-update every 15 minutes
-    while True:
-        await asyncio.sleep(900)
-        try:
-            embed = await build_embed()
-            await msg.edit(embed=embed)
-        except (discord.NotFound, discord.Forbidden):
-            self.active_messages.pop(guild_id, None)
-            break
-        except Exception:
-            continue
+while True:
+    await asyncio.sleep(900)
+    try:
+        embed = await build_embed()
+        await msg.edit(embed=embed)
+    except (discord.NotFound, discord.Forbidden):
+        self.active_messages.pop(guild_id, None)
+        break
+    except Exception:
+        continue
