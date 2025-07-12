@@ -490,7 +490,6 @@ async def globalbanstats(self, interaction):
         embed = discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red())
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # Only allow one active message per guild, delete old if present
     guild_id = interaction.guild_id
     if guild_id in self.active_messages:
         try:
@@ -499,8 +498,16 @@ async def globalbanstats(self, interaction):
             pass
         del self.active_messages[guild_id]
 
-    # Everything below here needs to be indented to stay inside globalbanstats
+    # Step 1: Send temporary loading embed
+    loading_embed = discord.Embed(
+        title="Loading Global Ban Stats...",
+        description="Fetching ban data. This may take a few seconds.",
+        color=discord.Color.greyple()
+    )
+    await interaction.response.send_message(embed=loading_embed, ephemeral=False)
+    msg = await interaction.original_response()
 
+    # Fetch bans and build embed
     async def fetch_bans(guild):
         if guild.id in self.server_blacklist:
             return 0
@@ -533,12 +540,13 @@ async def globalbanstats(self, interaction):
         embed.set_footer(text=f"Last updated: {updated_at}")
         return embed
 
-    await interaction.response.send_message(embed=await build_embed(), ephemeral=False)
-    msg = await interaction.original_response()
+    # Step 2: Edit the original message with the real stats
+    await msg.edit(embed=await build_embed())
     self.active_messages[guild_id] = msg
 
+    # Step 3: Update every 15 minutes
     while True:
-        await asyncio.sleep(900)  # 15 minutes
+        await asyncio.sleep(900)
         try:
             await msg.edit(embed=await build_embed())
         except (discord.NotFound, discord.Forbidden):
