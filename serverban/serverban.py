@@ -485,7 +485,11 @@ class ServerBan(red_commands.Cog):
 async def globalbanstats(self, interaction: Interaction):
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(
-            embed=discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red()),
+            embed=discord.Embed(
+                title="Unauthorized",
+                description="You cannot use this command.",
+                color=discord.Color.red()
+            ),
             ephemeral=True
         )
 
@@ -501,7 +505,7 @@ async def globalbanstats(self, interaction: Interaction):
                 bans = await guild.bans()
                 total_bans += len(bans)
             except Exception:
-                pass  # ignore guilds where bot lacks permissions
+                continue  # Skip guilds without permission
 
         updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
