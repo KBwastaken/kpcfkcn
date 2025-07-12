@@ -480,13 +480,11 @@ async def globalbanstats(self, interaction: discord.Interaction):  # Fully quali
                 color=discord.Color.orange()
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
-            
-
-
-
+        
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction):
+async def globalbanstats(self, interaction: discord.Interaction) -> None:
+    # Permission check
     if interaction.user.id not in self.ALLOWED_GLOBAL_IDS:
         embed = discord.Embed(
             title="Unauthorized",
@@ -497,30 +495,35 @@ async def globalbanstats(self, interaction):
         return
 
     guild_id = interaction.guild_id
+
+    # Remove old active message if exists
     if guild_id in self.active_messages:
         try:
             await self.active_messages[guild_id].delete()
-        except:
+        except Exception:
             pass
         del self.active_messages[guild_id]
 
-    dots = [".", "..", "..."]
+    # Send initial message
     await interaction.response.send_message("Fetching bans.", ephemeral=False)
     msg = await interaction.original_response()
 
-    async def animate_loading():
+    dots = ["", ".", "..", "..."]
+
+    # Animate loading dots
+    async def animate_loading() -> None:
         i = 0
         while guild_id not in self.active_messages:
             try:
-                await msg.edit(content=f"Fetching bans{dots[i % 3]}")
+                await msg.edit(content=f"Fetching bans{dots[i % len(dots)]}")
                 i += 1
                 await asyncio.sleep(1)
-            except:
+            except Exception:
                 break
 
     loading_task = asyncio.create_task(animate_loading())
 
-    async def fetch_bans(guild):
+    async def fetch_bans(guild: discord.Guild) -> int:
         if guild.id in self.server_blacklist:
             return 0
         try:
@@ -532,10 +535,10 @@ async def globalbanstats(self, interaction):
             print(f"Error fetching bans from {guild.name}: {type(e).__name__} - {e}")
             return 0
 
-    async def build_embed():
-        tasks = [asyncio.wait_for(fetch_bans(guild), timeout=5) for guild in self.bot.guilds]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        total_normal_bans = sum(r if isinstance(r, int) else 0 for r in results)
+    async def build_embed() -> discord.Embed:
+        ban_counts = await asyncio.gather(*(fetch_bans(g) for g in self.bot.guilds))
+        total_normal_bans = sum(ban_counts)
+
         total_global_bans = len(self.global_ban_list)
         total_servers = len(self.bot.guilds)
         synced_servers = sum(1 for g in self.bot.guilds if g.id not in self.server_blacklist)
@@ -552,13 +555,13 @@ async def globalbanstats(self, interaction):
         embed.set_footer(text=f"Last updated: {updated_at}")
         return embed
 
-    try:
-        embed = await build_embed()
-        self.active_messages[guild_id] = msg
-        await msg.edit(content=None, embed=embed)
-    finally:
-        loading_task.cancel()
+    # Build embed and stop loading animation
+    embed = await build_embed()
+    self.active_messages[guild_id] = msg
+    loading_task.cancel()
+    await msg.edit(content=None, embed=embed)
 
+    # Auto-update every 15 minutes
     while True:
         await asyncio.sleep(900)
         try:
@@ -567,5 +570,5 @@ async def globalbanstats(self, interaction):
         except (discord.NotFound, discord.Forbidden):
             self.active_messages.pop(guild_id, None)
             break
-        except:
-            continue
+        except Exception:
+            pass
