@@ -557,4 +557,4 @@ class ServerBan(red_commands.Cog):
         self.bot.tree.add_command(self.globalbanstats)
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(BanStats(
+    await bot.add_cog(BanStats(bot))
