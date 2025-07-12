@@ -430,56 +430,7 @@ class ServerBan(red_commands.Cog):
         view = BanListView(entries=entries, per_page=20, user=interaction.user, ephemeral=ephemeral)
         await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
         
-@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-async def globalbanstats(self, interaction: discord.Interaction):  # Fully qualified type
-        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message(
-                embed=self._error_embed("Only the bot owner can run this command."),
-                ephemeral=True
-            )
 
-        await interaction.response.defer(ephemeral=True)
-        results = []
-
-        for guild in self.bot.guilds:
-            if guild.id in self.server_blacklist:
-                continue
-
-            guild_results = []
-            for user_id in self.global_ban_list:
-                try:
-                    already_banned = False
-                    async for entry in guild.bans():
-                        if entry.user.id == user_id:
-                            already_banned = True
-                            break
-                    if already_banned:
-                        guild_results.append(f"⚠️ `{user_id}` already banned")
-                    else:
-                        await guild.ban(discord.Object(id=user_id), reason="Global ban sync")
-                        guild_results.append(f"✅ `{user_id}` banned")
-                except Exception as e:
-                    guild_results.append(f"❌ `{user_id}`: {e}")
-
-            results.append(f"**{guild.name}** ({guild.id}):\n" + "\n".join(guild_results))
-
-        chunks = []
-        chunk = ""
-        for line in results:
-            if len(chunk) + len(line) + 2 >= 4000:
-                chunks.append(chunk)
-                chunk = ""
-            chunk += line + "\n\n"
-        if chunk:
-            chunks.append(chunk)
-
-        for index, chunk in enumerate(chunks):
-            embed = discord.Embed(
-                title=f"Global Ban Sync Results ({index + 1}/{len(chunks)})",
-                description=chunk,
-                color=discord.Color.orange()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
         
 
 
@@ -562,4 +513,9 @@ async def globalbanstats(self, interaction: discord.Interaction):  # Fully quali
                 self.active_messages.pop(guild_id, None)
                 break
             except Exception:
-                con
+                continue
+
+    async def cog_app_command_group(self) -> app_commands.Group:
+        group = app_commands.Group(name="serverban", description="ServerBan Commands")
+        group.add_command(self.globalbanstats)
+        return
