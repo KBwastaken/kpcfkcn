@@ -483,7 +483,7 @@ class ServerBan(red_commands.Cog):
 
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 10s).")
-async def globalbanstats(self, interaction: "discord.Interaction"):
+async def globalbanstats(self, interaction: "discord.Interaction"):  # string annotation fixes Redbot error
     if interaction.user.id not in ALLOWED_GLOBAL_IDS:
         return await interaction.response.send_message(
             embed=discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red()),
@@ -500,7 +500,7 @@ async def globalbanstats(self, interaction: "discord.Interaction"):
                 bans = await guild.bans()
                 total_server_bans += len(bans)
             except Exception:
-                continue  # skip guilds we can't access
+                continue  # skip inaccessible guilds
 
         updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -515,7 +515,7 @@ async def globalbanstats(self, interaction: "discord.Interaction"):
     msg = await interaction.original_response()
 
     while True:
-        await asyncio.sleep(900)
+        await asyncio.sleep(10)
         try:
             await msg.edit(embed=await build_embed())
         except (discord.NotFound, discord.Forbidden):
