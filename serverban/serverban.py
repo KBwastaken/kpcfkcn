@@ -486,7 +486,8 @@ async def globalbanstats(self, interaction: discord.Interaction):  # Fully quali
 
 @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
 async def globalbanstats(self, interaction):
-    if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+    # Permissions check
+    if interaction.user.id not in self.ALLOWED_GLOBAL_IDS:
         embed = discord.Embed(
             title="Unauthorized",
             description="You cannot use this command.",
@@ -495,6 +496,7 @@ async def globalbanstats(self, interaction):
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     guild_id = interaction.guild_id
+    # Delete old active message if exists
     if guild_id in self.active_messages:
         try:
             await self.active_messages[guild_id].delete()
@@ -502,6 +504,7 @@ async def globalbanstats(self, interaction):
             pass
         del self.active_messages[guild_id]
 
+    # Animated loading dots
     dots = [".", "..", "..."]
     await interaction.response.send_message("Fetching bans.", ephemeral=False)
     msg = await interaction.original_response()
@@ -532,9 +535,9 @@ async def globalbanstats(self, interaction):
 
     async def build_embed():
         tasks = [asyncio.wait_for(fetch_bans(guild), timeout=5) for guild in self.bot.guilds]
-        ban_counts = await asyncio.gather(*tasks, return_exceptions=True)
-        total_normal_bans = sum(count if isinstance(count, int) else 0 for count in ban_counts)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        total_normal_bans = sum(count if isinstance(count, int) else 0 for count in results)
         total_global_bans = len(self.global_ban_list)
         total_servers = len(self.bot.guilds)
         synced_servers = sum(1 for g in self.bot.guilds if g.id not in self.server_blacklist)
@@ -558,8 +561,9 @@ async def globalbanstats(self, interaction):
     finally:
         loading_task.cancel()
 
+    # Auto-update every 15 minutes
     while True:
-        await asyncio.sleep(900)
+        await asyncio.sleep(900)  # 15 minutes
         try:
             embed = await build_embed()
             await msg.edit(embed=embed)
@@ -567,4 +571,5 @@ async def globalbanstats(self, interaction):
             self.active_messages.pop(guild_id, None)
             break
         except Exception:
+            # keep trying silently if other errors
             continue
