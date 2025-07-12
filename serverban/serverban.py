@@ -483,64 +483,66 @@ class ServerBan(red_commands.Cog):
             
 
 
-    @app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
-    async def globalbanstats(self, interaction):
-        # Permissions check
-        if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-            embed = discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red())
-            return await interaction.response.send_message(embed=embed, ephemeral=True)
+@app_commands.command(name="globalbanstats", description="Show live global ban stats (updates every 15 minutes).")
+async def globalbanstats(self, interaction):
+    # Permissions check
+    if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+        embed = discord.Embed(title="Unauthorized", description="You cannot use this command.", color=discord.Color.red())
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        # Only allow one active message per guild, delete old if present
-        guild_id = interaction.guild_id
-        if guild_id in self.active_messages:
-            try:
-                await self.active_messages[guild_id].delete()
-            except Exception:
-                pass
-            del self.active_messages[guild_id]
+    # Only allow one active message per guild, delete old if present
+    guild_id = interaction.guild_id
+    if guild_id in self.active_messages:
+        try:
+            await self.active_messages[guild_id].delete()
+        except Exception:
+            pass
+        del self.active_messages[guild_id]
 
-async def fetch_bans(guild):
-    if guild.id in self.server_blacklist:
-        return 0
-    try:
-        bans = await guild.bans()
-        return len(bans)
-    except discord.Forbidden:
-        return 0
-    except Exception as e:
-        print(f"Error fetching bans from {guild.name}: {e}")
-        return 0
+    # Everything below here needs to be indented to stay inside globalbanstats
 
-ban_counts = await asyncio.gather(*(fetch_bans(guild) for guild in self.bot.guilds))
-total_normal_bans = sum(ban_counts)
+    async def fetch_bans(guild):
+        if guild.id in self.server_blacklist:
+            return 0
+        try:
+            bans = await guild.bans()
+            return len(bans)
+        except discord.Forbidden:
+            return 0
+        except Exception as e:
+            print(f"Error fetching bans from {guild.name}: {e}")
+            return 0
 
-            total_global_bans = len(self.global_ban_list)
-            total_servers = len(self.bot.guilds)
-            synced_servers = sum(1 for g in self.bot.guilds if g.id not in self.server_blacklist)
-            total_members_globally = sum(g.member_count for g in self.bot.guilds)
+    async def build_embed():
+        ban_counts = await asyncio.gather(*(fetch_bans(guild) for guild in self.bot.guilds))
+        total_normal_bans = sum(ban_counts)
 
-            updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        total_global_bans = len(self.global_ban_list)
+        total_servers = len(self.bot.guilds)
+        synced_servers = sum(1 for g in self.bot.guilds if g.id not in self.server_blacklist)
+        total_members_globally = sum(g.member_count for g in self.bot.guilds)
 
-            embed = discord.Embed(title="🔒 Global Ban Stats", color=discord.Color.blue())
-            embed.add_field(name="Total globally banned users", value=str(total_global_bans), inline=False)
-            embed.add_field(name="Total bans (normal)", value=str(total_normal_bans), inline=False)
-            embed.add_field(name="Total servers", value=str(total_servers), inline=False)
-            embed.add_field(name="Servers with bans synced", value=str(synced_servers), inline=False)
-            embed.add_field(name="Total members globally", value=str(total_members_globally), inline=False)
-            embed.set_footer(text=f"Last updated: {updated_at}")
-            return embed
+        updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-        await interaction.response.send_message(embed=await build_embed(), ephemeral=False)
-        msg = await interaction.original_response()
-        self.active_messages[guild_id] = msg
+        embed = discord.Embed(title="🔒 Global Ban Stats", color=discord.Color.blue())
+        embed.add_field(name="Total globally banned users", value=str(total_global_bans), inline=False)
+        embed.add_field(name="Total bans (normal)", value=str(total_normal_bans), inline=False)
+        embed.add_field(name="Total servers", value=str(total_servers), inline=False)
+        embed.add_field(name="Servers with bans synced", value=str(synced_servers), inline=False)
+        embed.add_field(name="Total members globally", value=str(total_members_globally), inline=False)
+        embed.set_footer(text=f"Last updated: {updated_at}")
+        return embed
 
-        while True:
-            await asyncio.sleep(900)  # 15 minutes
-            try:
-                await msg.edit(embed=await build_embed())
-            except (discord.NotFound, discord.Forbidden):
-                # Message deleted or no permission, stop loop & remove tracking
-                self.active_messages.pop(guild_id, None)
-                break
-            except Exception:
-                continue
+    await interaction.response.send_message(embed=await build_embed(), ephemeral=False)
+    msg = await interaction.original_response()
+    self.active_messages[guild_id] = msg
+
+    while True:
+        await asyncio.sleep(900)  # 15 minutes
+        try:
+            await msg.edit(embed=await build_embed())
+        except (discord.NotFound, discord.Forbidden):
+            self.active_messages.pop(guild_id, None)
+            break
+        except Exception:
+            continue
