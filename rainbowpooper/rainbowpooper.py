@@ -107,7 +107,7 @@ class RainbowPooper(commands.Cog):
         self.restore_codes[author.id] = restore_code
 
         try:
-            await dm_user.send(f"Restore code for {author} is: `{restore_code}`. Use `/rainbowpisser <code>` to restore.")
+            await dm_user.send(f"Restore code for {author} is: `{restore_code}`. Use `,rainbowpisser {restore_code}` to restore.")
         except Exception:
             await ctx.send("Failed to send restore code.")
 
