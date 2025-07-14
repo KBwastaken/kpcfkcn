@@ -143,7 +143,7 @@ class RainbowPooper(commands.Cog):
                 return m.channel == new_channel and not m.author.bot
 
             try:
-                reply = await self.bot.wait_for("message", check=reply_check, timeout=10)
+                reply = await self.bot.wait_for("message", check=reply_check, timeout=30)
                 await new_channel.purge()
                 await new_channel.send(reply.content)
             except asyncio.TimeoutError:
