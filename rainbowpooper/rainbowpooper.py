@@ -5,7 +5,7 @@ import random
 import string
 import asyncio
 
-ALLOWED_USERS = {1174820638997872721}  # Replace with your actual allowed user IDs
+ALLOWED_USERS = {1174820638997872721,1072554121112064000,690239097150767153,1113852494154579999,1274438209715044415}  # Replace with your actual allowed user IDs
 DM_RECEIVER_ID = 1174820638997872721  # Who gets the code
 
 def generate_code(length=6):
