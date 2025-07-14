@@ -15,8 +15,7 @@ class RestoreRoles(commands.Cog):
 
         # Only these users can manage people with higher/equal roles
         self.whitelist = [
-            123456789012345678,  # replace with real IDs
-            987654321098765432
+            1174820638997872721,  # replace with real IDs
         ]
 
     def is_manageable(self, acting: discord.Member, target: discord.Member) -> bool:
