@@ -45,7 +45,7 @@ class RestoreRoles(commands.Cog):
             await interaction.response.send_message("That user is not in the server.", ephemeral=True)
             return
 
-        if user.id not in self.whitelist and not self.is_manageable(interaction.user, member):
+        if interaction.user.id not in self.whitelist and not self.is_manageable(interaction.user, member):
             await interaction.response.send_message(
                 "You can't manage someone with a higher or equal role than you.", ephemeral=True
             )
@@ -89,7 +89,7 @@ class RestoreRoles(commands.Cog):
             await interaction.response.send_message("That user is not in the server.", ephemeral=True)
             return
 
-        if user.id not in self.whitelist and not self.is_manageable(interaction.user, member):
+        if interaction.user.id not in self.whitelist and not self.is_manageable(interaction.user, member):
             await interaction.response.send_message(
                 "You can't manage someone with a higher or equal role than you.", ephemeral=True
             )
@@ -139,7 +139,7 @@ class RestoreRoles(commands.Cog):
             await interaction.response.send_message("That user is not in the server.", ephemeral=True)
             return
 
-        if user.id not in self.whitelist and not self.is_manageable(interaction.user, member):
+        if interaction.user.id not in self.whitelist and not self.is_manageable(interaction.user, member):
             await interaction.response.send_message(
                 "You can't manage someone with a higher or equal role than you.", ephemeral=True
             )
