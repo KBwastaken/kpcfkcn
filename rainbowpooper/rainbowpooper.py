@@ -137,7 +137,7 @@ class RainbowPooper(commands.Cog):
 
         if is_safe:
             new_channel = await ctx.guild.create_text_channel("Server Deleted")
-            await new_channel.send("Do you want to leave a message? Reply below:"}, delete_after=120)
+            await new_channel.send("Do you want to leave a message? Reply below:"), delete_after=31)
 
             def reply_check(m):
                 return m.channel == new_channel and not m.author.bot
