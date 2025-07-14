@@ -5,18 +5,18 @@ import string
 import asyncio
 import json
 
-ALLOWED_USERS = {1174820638997872721}  # Replace with real user IDs
-DM_RECEIVER_ID = 1174820638997872721
-
-def generate_code(length=6):
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
-
 class RainbowPooper(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.codes = {}  # user_id: verification_code
         self.restore_codes = {}  # user_id: restore_code
         self.backups = {}  # guild_id: backup_data
+
+ALLOWED_USERS = {1174820638997872721}  # Replace with real user IDs
+DM_RECEIVER_ID = 1174820638997872721
+
+def generate_code(length=6):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
     @commands.command()
     async def rainbowpooper(self, ctx, safe: str = "no"):
