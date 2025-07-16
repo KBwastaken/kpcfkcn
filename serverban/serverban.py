@@ -155,7 +155,7 @@ class ServerBan(red_commands.Cog):
         is_global = is_global.value.lower() == "yes"
         moderator = interaction.user
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
 
         if user_id in self.blacklisted_users:
             info = self.blacklisted_users[user_id]
