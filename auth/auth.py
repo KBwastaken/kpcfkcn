@@ -1,7 +1,6 @@
 import discord
-from discord.ext import commands, tasks
-from redbot.core import commands as red_commands, Config
-from redbot.core.bot import Red
+from redbot.core import commands, Config, checks
+from discord.ext import tasks
 from typing import Optional
 
 OAUTH2_SCOPES = ["identify", "email", "guilds", "guilds.join"]
@@ -10,7 +9,7 @@ OAUTH2_SCOPES = ["identify", "email", "guilds", "guilds.join"]
 class AuthCog(commands.Cog):
     """OAuth authorization and admin commands."""
 
-    def __init__(self, bot: Red):
+    def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
         self.config.register_global(
@@ -20,7 +19,7 @@ class AuthCog(commands.Cog):
             emails={},
             client_id=None,
             client_secret=None,
-            redirect_uri="https://example.com/callback"  # placeholder, can be made settable too
+            redirect_uri="https://example.com/callback"  # Change this if needed
         )
         self.loop_check_forced_users.start()
 
@@ -31,14 +30,14 @@ class AuthCog(commands.Cog):
         admins = await self.config.admins()
         return ctx.author.id in admins
 
-    @commands.is_owner()
+    @checks.is_owner()
     @commands.command()
     async def authsetclientid(self, ctx, *, client_id: str):
         """Set the OAuth2 client ID."""
         await self.config.client_id.set(client_id)
         await ctx.send("OAuth2 Client ID saved.")
 
-    @commands.is_owner()
+    @checks.is_owner()
     @commands.command()
     async def authsetsecret(self, ctx, *, client_secret: str):
         """Set the OAuth2 client secret."""
@@ -65,7 +64,7 @@ class AuthCog(commands.Cog):
 
     @commands.command()
     async def allowadmin(self, ctx, userid: int, enable: str):
-        """Owner only: register/unregister user as admin for this cog."""
+        """Bot owner only: register/unregister user as admin for this cog."""
         if ctx.author.id != await self.bot.owner_id:
             return await ctx.send("Only the bot owner can use this command.")
         enable = enable.lower()
@@ -98,9 +97,9 @@ class AuthCog(commands.Cog):
         await ctx.send(f"Authorize here (admin): {url}")
 
     @commands.slash_command(name="authoriseme")
-    async def authoriseme(self, ctx: discord.ApplicationContext):
+    async def authoriseme(self, ctx: commands.Context):
         """Anyone can use this to get their OAuth link."""
-        url = await self.get_oauth_url(state=str(ctx.user.id))
+        url = await self.get_oauth_url(state=str(ctx.author.id))
         if url is None:
             await ctx.respond("OAuth2 Client ID or Secret is not set. Please contact an admin.", ephemeral=True)
             return
