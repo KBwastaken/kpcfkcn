@@ -1,94 +1,192 @@
 import discord
 from discord.ext import commands, tasks
-from redbot.core import Config
+from redbot.core import commands as red_commands, Config
 from redbot.core.bot import Red
+from typing import Optional
 
-class Auth(commands.Cog):
+OAUTH2_SCOPES = ["identify", "email", "guilds", "guilds.join"]
+
+
+class AuthCog(commands.Cog):
+    """OAuth authorization and admin commands."""
+
     def __init__(self, bot: Red):
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=345678901234)
-        default_global = {
-            "admins": [],
-            "forced_users": {},
-            "force_all": {},
-            "tokens": {}
-        }
-        self.config.register_global(**default_global)
-        self.loop_check.start()
+        self.config = Config.get_conf(self, identifier=1234567890)
+        self.config.register_global(
+            admins=[],
+            forced_users={},
+            allowadmin={},
+            emails={},
+            client_id=None,
+            client_secret=None,
+            redirect_uri="https://example.com/callback"  # placeholder, can be made settable too
+        )
+        self.loop_check_forced_users.start()
 
     def cog_unload(self):
-        self.loop_check.cancel()
+        self.loop_check_forced_users.cancel()
 
-    @tasks.loop(minutes=1)
-    async def loop_check(self):
-        # This runs every minute — replace with your real logic or leave empty
-        forced_users = await self.config.forced_users()
-        for user_id, data in forced_users.items():
-            if not data.get("loop"):
-                continue
-            guild = self.bot.get_guild(data.get("server_id"))
-            if not guild:
-                continue
-            member = guild.get_member(int(user_id))
-            if member is None:
-                # Here you would add the user back to the guild if looping is enabled
-                # For now, just print a message (or remove this block)
-                print(f"User {user_id} is not in guild {data.get('server_id')}, should re-add")
-
-    def is_admin():
-        async def predicate(ctx):
-            admins = await ctx.cog.config.admins()
-            return str(ctx.author.id) in admins
-        return commands.check(predicate)
-
-    @commands.hybrid_command(name="authoriseme", with_app_command=True)
-    async def authoriseme(self, ctx):
-        await ctx.send(
-            "You're authorized (mock).\n"
-            "- This app can see your email, servers, and add you to servers.\n"
-            "Tokens must be added manually or via admin commands."
-        )
-
-    @commands.command()
-    @is_admin()
-    async def authforce(self, ctx, user: discord.User, server_id: int, loop: str):
-        looping = loop.lower() == "yes"
-        forced_users = await self.config.forced_users()
-        forced_users[str(user.id)] = {
-            "server_id": server_id,
-            "loop": looping
-        }
-        await self.config.forced_users.set(forced_users)
-        await ctx.send(f"Will try adding {user.name} to server {server_id}. Looping: {looping}")
-
-    @commands.command()
-    @is_admin()
-    async def authforceall(self, ctx, user: discord.User, enable: str):
-        enabled = enable.lower() == "on"
-        force_all = await self.config.force_all()
-        force_all[str(user.id)] = enabled
-        await self.config.force_all.set(force_all)
-        status = "enabled" if enabled else "disabled"
-        await ctx.send(f"Force auth all servers {status} for {user.name}")
-
-    @commands.command()
-    @commands.is_owner()
-    async def allowadmin(self, ctx, user: discord.User, enable: str):
+    async def check_admin(self, ctx):
         admins = await self.config.admins()
-        if enable.lower() == "on":
-            if str(user.id) not in admins:
-                admins.append(str(user.id))
-                await ctx.send(f"{user.name} is now an admin.")
+        return ctx.author.id in admins
+
+    @commands.is_owner()
+    @commands.command()
+    async def authsetclientid(self, ctx, *, client_id: str):
+        """Set the OAuth2 client ID."""
+        await self.config.client_id.set(client_id)
+        await ctx.send("OAuth2 Client ID saved.")
+
+    @commands.is_owner()
+    @commands.command()
+    async def authsetsecret(self, ctx, *, client_secret: str):
+        """Set the OAuth2 client secret."""
+        await self.config.client_secret.set(client_secret)
+        await ctx.send("OAuth2 Client Secret saved.")
+
+    async def get_oauth_url(self, state: Optional[str] = None) -> Optional[str]:
+        client_id = await self.config.client_id()
+        client_secret = await self.config.client_secret()
+        redirect_uri = await self.config.redirect_uri()
+        if not client_id or not client_secret:
+            return None
+        scopes = "%20".join(OAUTH2_SCOPES)
+        base = "https://discord.com/api/oauth2/authorize"
+        url = (
+            f"{base}?client_id={client_id}"
+            f"&redirect_uri={redirect_uri}"
+            f"&response_type=code"
+            f"&scope={scopes}"
+        )
+        if state:
+            url += f"&state={state}"
+        return url
+
+    @commands.command()
+    async def allowadmin(self, ctx, userid: int, enable: str):
+        """Owner only: register/unregister user as admin for this cog."""
+        if ctx.author.id != await self.bot.owner_id:
+            return await ctx.send("Only the bot owner can use this command.")
+        enable = enable.lower()
+        admins = await self.config.admins()
+        if enable == "on":
+            if userid not in admins:
+                admins.append(userid)
+                await ctx.send(f"User {userid} added as admin.")
+            else:
+                await ctx.send(f"User {userid} is already an admin.")
+        elif enable == "off":
+            if userid in admins:
+                admins.remove(userid)
+                await ctx.send(f"User {userid} removed from admins.")
+            else:
+                await ctx.send(f"User {userid} was not an admin.")
         else:
-            if str(user.id) in admins:
-                admins.remove(str(user.id))
-                await ctx.send(f"{user.name} is no longer an admin.")
+            await ctx.send("Enable must be 'on' or 'off'.")
+            return
         await self.config.admins.set(admins)
 
     @commands.command()
-    @is_admin()
-    async def checkemail(self, ctx, user: discord.User):
-        await ctx.send(f"Email for {user.name}: user@example.com")
+    async def auth(self, ctx):
+        """Admin command to get OAuth link for authorizing others."""
+        if not await self.check_admin(ctx):
+            return await ctx.send("You must be an admin to use this command.")
+        url = await self.get_oauth_url(state=str(ctx.author.id))
+        if url is None:
+            return await ctx.send("OAuth2 Client ID or Secret is not set. Use authsetclientid and authsetsecret.")
+        await ctx.send(f"Authorize here (admin): {url}")
 
-async def setup(bot):
-    await bot.add_cog(Auth(bot))
+    @commands.slash_command(name="authoriseme")
+    async def authoriseme(self, ctx: discord.ApplicationContext):
+        """Anyone can use this to get their OAuth link."""
+        url = await self.get_oauth_url(state=str(ctx.user.id))
+        if url is None:
+            await ctx.respond("OAuth2 Client ID or Secret is not set. Please contact an admin.", ephemeral=True)
+            return
+        await ctx.respond(f"Authorize yourself here: {url}", ephemeral=True)
+
+    @commands.command()
+    async def authforce(self, ctx, userid: int, server_id: int, loop: str = "no"):
+        """Force add user to server, loop readds if left."""
+        if not await self.check_admin(ctx):
+            return await ctx.send("You must be an admin to use this command.")
+        loop_enabled = loop.lower() == "yes"
+        forced = await self.config.forced_users()
+        user_data = forced.get(str(userid), {"servers": [], "loop": False})
+
+        if server_id not in user_data["servers"]:
+            user_data["servers"].append(server_id)
+        user_data["loop"] = loop_enabled
+        forced[str(userid)] = user_data
+        await self.config.forced_users.set(forced)
+
+        guild = self.bot.get_guild(server_id)
+        if not guild:
+            return await ctx.send(f"Server ID {server_id} not found.")
+        member = guild.get_member(userid)
+        if member:
+            await ctx.send(f"User {userid} is already in server {server_id}.")
+        else:
+            await ctx.send(f"User {userid} is not in server {server_id}. Cannot add automatically without OAuth token.")
+
+        await ctx.send(f"User {userid} forced to server {server_id} with loop={loop_enabled}")
+
+    @commands.command()
+    async def authforceall(self, ctx, userid: int, enable: str):
+        """Force add or remove user to/from all servers bot is in."""
+        if not await self.check_admin(ctx):
+            return await ctx.send("You must be an admin to use this command.")
+        enable = enable.lower()
+        forced = await self.config.forced_users()
+        user_data = forced.get(str(userid), {"servers": [], "loop": False})
+
+        if enable == "on":
+            user_data["servers"] = [g.id for g in self.bot.guilds]
+            user_data["loop"] = True
+            forced[str(userid)] = user_data
+            await ctx.send(f"User {userid} forced in all servers with looping enabled.")
+        elif enable == "off":
+            if str(userid) in forced:
+                del forced[str(userid)]
+            await ctx.send(f"User {userid} removed from forced list.")
+        else:
+            await ctx.send("Enable must be 'on' or 'off'.")
+            return
+        await self.config.forced_users.set(forced)
+
+    @commands.command()
+    async def checkemail(self, ctx, userid: int):
+        """Check email of a user via stored OAuth info."""
+        if not await self.check_admin(ctx):
+            return await ctx.send("You must be an admin to use this command.")
+        emails = await self.config.emails()
+        email = emails.get(str(userid))
+        if email:
+            await ctx.send(f"User {userid} email: {email}")
+        else:
+            await ctx.send(f"No email stored for user {userid}.")
+
+    @tasks.loop(minutes=5)
+    async def loop_check_forced_users(self):
+        forced = await self.config.forced_users()
+        for user_id_str, data in forced.items():
+            if not data.get("loop", False):
+                continue
+            user_id = int(user_id_str)
+            for server_id in data.get("servers", []):
+                guild = self.bot.get_guild(server_id)
+                if not guild:
+                    continue
+                member = guild.get_member(user_id)
+                if member is None:
+                    owner = guild.owner
+                    if owner:
+                        try:
+                            await owner.send(f"User {user_id} left {guild.name} but is forced to be there. Manual re-add required.")
+                        except Exception:
+                            pass
+
+    @loop_check_forced_users.before_loop
+    async def before_loop_check(self):
+        await self.bot.wait_until_ready()
