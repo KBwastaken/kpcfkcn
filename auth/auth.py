@@ -62,29 +62,29 @@ class AuthCog(commands.Cog):
             url += f"&state={state}"
         return url
 
-    @commands.command()
-    async def allowadmin(self, ctx, userid: int, enable: str):
-        """Bot owner only: register/unregister user as admin for this cog."""
-        if ctx.author.id != await self.bot.owner_id:
-            return await ctx.send("Only the bot owner can use this command.")
-        enable = enable.lower()
-        admins = await self.config.admins()
-        if enable == "on":
-            if userid not in admins:
-                admins.append(userid)
-                await ctx.send(f"User {userid} added as admin.")
-            else:
-                await ctx.send(f"User {userid} is already an admin.")
-        elif enable == "off":
-            if userid in admins:
-                admins.remove(userid)
-                await ctx.send(f"User {userid} removed from admins.")
-            else:
-                await ctx.send(f"User {userid} was not an admin.")
+@commands.command()
+async def allowadmin(self, ctx, userid: int, enable: str):
+    """Bot owner only: register/unregister user as admin for this cog."""
+    if self.bot.owner_ids is None or ctx.author.id not in self.bot.owner_ids:
+        return await ctx.send("Only the bot owner can use this command.")
+    enable = enable.lower()
+    admins = await self.config.admins()
+    if enable == "on":
+        if userid not in admins:
+            admins.append(userid)
+            await ctx.send(f"User {userid} added as admin.")
         else:
-            await ctx.send("Enable must be 'on' or 'off'.")
-            return
-        await self.config.admins.set(admins)
+            await ctx.send(f"User {userid} is already an admin.")
+    elif enable == "off":
+        if userid in admins:
+            admins.remove(userid)
+            await ctx.send(f"User {userid} removed from admins.")
+        else:
+            await ctx.send(f"User {userid} was not an admin.")
+    else:
+        await ctx.send("Enable must be 'on' or 'off'.")
+        return
+    await self.config.admins.set(admins)
 
     @commands.command()
     async def authme(self, ctx):
