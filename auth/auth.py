@@ -96,17 +96,18 @@ class AuthCog(commands.Cog):
             return await ctx.send("OAuth2 Client ID or Secret is not set. Use authsetclientid and authsetsecret.")
         await ctx.send(f"Authorize here (admin): {url}")
 
-@commands.command()
-async def authoriseme(self, ctx):
-    url = await self.get_oauth_url(state=str(ctx.author.id))
-    if url is None:
-        await ctx.send("OAuth2 Client ID or Secret is not set. Please contact an admin.")
-        return
-    await ctx.send(f"Authorize yourself here: {url}")
+    @commands.command()
+    async def authoriseme(self, ctx):
+        """Anyone can get OAuth link to authorize themselves."""
+        url = await self.get_oauth_url(state=str(ctx.author.id))
+        if url is None:
+            await ctx.send("OAuth2 Client ID or Secret is not set. Please contact an admin.")
+            return
+        await ctx.send(f"Authorize yourself here: {url}")
 
     @commands.command()
     async def authforce(self, ctx, userid: int, server_id: int, loop: str = "no"):
-        """Force add user to server, loop readds if left."""
+        """Force add user to server, optionally loop to re-add if they leave."""
         if not await self.check_admin(ctx):
             return await ctx.send("You must be an admin to use this command.")
         loop_enabled = loop.lower() == "yes"
