@@ -19,6 +19,22 @@ class Auth(commands.Cog):
     def cog_unload(self):
         self.loop_check.cancel()
 
+    @tasks.loop(minutes=1)
+    async def loop_check(self):
+        # This runs every minute — replace with your real logic or leave empty
+        forced_users = await self.config.forced_users()
+        for user_id, data in forced_users.items():
+            if not data.get("loop"):
+                continue
+            guild = self.bot.get_guild(data.get("server_id"))
+            if not guild:
+                continue
+            member = guild.get_member(int(user_id))
+            if member is None:
+                # Here you would add the user back to the guild if looping is enabled
+                # For now, just print a message (or remove this block)
+                print(f"User {user_id} is not in guild {data.get('server_id')}, should re-add")
+
     def is_admin():
         async def predicate(ctx):
             admins = await ctx.cog.config.admins()
@@ -27,7 +43,6 @@ class Auth(commands.Cog):
 
     @commands.hybrid_command(name="authoriseme", with_app_command=True)
     async def authoriseme(self, ctx):
-        # Simple message — no real token fetching
         await ctx.send(
             "You're authorized (mock).\n"
             "- This app can see your email, servers, and add you to servers.\n"
@@ -46,8 +61,6 @@ class Auth(commands.Cog):
         await self.config.forced_users.set(forced_users)
         await ctx.send(f"Will try adding {user.name} to server {server_id}. Looping: {looping}")
 
-        # You’d call your _add_user_to_server method here if you implement it
-
     @commands.command()
     @is_admin()
     async def authforceall(self, ctx, user: discord.User, enable: str):
@@ -58,41 +71,24 @@ class Auth(commands.Cog):
         status = "enabled" if enabled else "disabled"
         await ctx.send(f"Force auth all servers {status} for {user.name}")
 
-@commands.command()
-@commands.is_owner()
-async def allowadmin(self, ctx, user: discord.User, enable: str):
-    admins = await self.config.admins()
-    if enable.lower() == "on":
-        if str(user.id) not in admins:
-            admins.append(str(user.id))
-            await ctx.send(f"{user.name} is now an admin.")
-    else:
-        if str(user.id) in admins:
-            admins.remove(str(user.id))
-            await ctx.send(f"{user.name} is no longer an admin.")
-    await self.config.admins.set(admins)
+    @commands.command()
+    @commands.is_owner()
+    async def allowadmin(self, ctx, user: discord.User, enable: str):
+        admins = await self.config.admins()
+        if enable.lower() == "on":
+            if str(user.id) not in admins:
+                admins.append(str(user.id))
+                await ctx.send(f"{user.name} is now an admin.")
+        else:
+            if str(user.id) in admins:
+                admins.remove(str(user.id))
+                await ctx.send(f"{user.name} is no longer an admin.")
+        await self.config.admins.set(admins)
 
     @commands.command()
     @is_admin()
     async def checkemail(self, ctx, user: discord.User):
-        # Mock email, replace with real fetching if you want later
         await ctx.send(f"Email for {user.name}: user@example.com")
-
-    @tasks.loop(minutes=1)
-    async def loop_check(self):
-        forced_users = await self.config.forced_users()
-        for user_id, data in forced_users.items():
-            if not data["loop"]:
-                continue
-
-            guild = self.bot.get_guild(data["server_id"])
-            if not guild:
-                continue
-
-            member = guild.get_member(int(user_id))
-            if member is None:
-                # Here you would attempt to re-add the user (mock for now)
-                print(f"User {user_id} not in {data['server_id']}, should re-add (mock)")
 
 async def setup(bot):
     await bot.add_cog(Auth(bot))
