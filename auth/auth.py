@@ -96,14 +96,13 @@ class AuthCog(commands.Cog):
             return await ctx.send("OAuth2 Client ID or Secret is not set. Use authsetclientid and authsetsecret.")
         await ctx.send(f"Authorize here (admin): {url}")
 
-    @commands.slash_command(name="authoriseme")
-    async def authoriseme(self, ctx: commands.Context):
-        """Anyone can use this to get their OAuth link."""
-        url = await self.get_oauth_url(state=str(ctx.author.id))
-        if url is None:
-            await ctx.respond("OAuth2 Client ID or Secret is not set. Please contact an admin.", ephemeral=True)
-            return
-        await ctx.respond(f"Authorize yourself here: {url}", ephemeral=True)
+@commands.command()
+async def authoriseme(self, ctx):
+    url = await self.get_oauth_url(state=str(ctx.author.id))
+    if url is None:
+        await ctx.send("OAuth2 Client ID or Secret is not set. Please contact an admin.")
+        return
+    await ctx.send(f"Authorize yourself here: {url}")
 
     @commands.command()
     async def authforce(self, ctx, userid: int, server_id: int, loop: str = "no"):
