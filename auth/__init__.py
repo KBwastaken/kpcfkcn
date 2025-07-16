@@ -1,4 +1,4 @@
-from .auth import Auth
+from .auth import AuthCog
 
 async def setup(bot):
-    await bot.add_cog(Auth(bot))
+    await bot.add_cog(AuthCog(bot))
