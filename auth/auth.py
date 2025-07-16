@@ -87,7 +87,7 @@ class AuthCog(commands.Cog):
         await self.config.admins.set(admins)
 
     @commands.command()
-    async def auth(self, ctx):
+    async def authme(self, ctx):
         """Admin command to get OAuth link for authorizing others."""
         if not await self.check_admin(ctx):
             return await ctx.send("You must be an admin to use this command.")
