@@ -215,8 +215,8 @@ async def sunban(self, interaction: discord.Interaction, user_id: str, is_global
         except Exception:
             pass
 
-    @app_commands.command(name="bansync", description="Sync all globally banned users to this server.")
-    async def bansync(self, interaction: discord.Interaction):
+@app_commands.command(name="bansync", description="Sync all globally banned users to this server.")
+async def bansync(self, interaction: discord.Interaction):
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(
                 embed=self._error_embed("You are not authorized to use this command."),
