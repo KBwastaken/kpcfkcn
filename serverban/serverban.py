@@ -534,7 +534,7 @@ class ServerBan(red_commands.Cog):
         embed.add_field(name="Total Server Bans", value=str(total_bans), inline=True)
         embed.add_field(name="Last Ban Sync", value=last_sync_str, inline=False)
 
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=False)
 
     async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
         log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
