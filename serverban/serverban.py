@@ -154,7 +154,7 @@ class ServerBan(red_commands.Cog):
         await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
         await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global_flag))
 
-    async def log_regular_ban(self, user: discord.User, moderator: discord.User, reason: str):
+    async def log_regular_ban(self, user: discord.User, moderator: discord.User, reason: str, guild: discord.Guild):
         log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
         if not log_channel:
             return
