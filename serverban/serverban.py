@@ -160,7 +160,7 @@ async def cog_load(self):
     app_commands.Choice(name="Yes", value="yes")
 ])
 @app_commands.checks.has_permissions(ban_members=True)
-async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
+async def sunban(self, interaction: Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
     try:
         user_id = int(user_id)
     except ValueError:
