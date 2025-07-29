@@ -169,21 +169,22 @@ class ServerBan(red_commands.Cog):
         is_global_flag = is_global.value.lower() == "yes"
         moderator = interaction.user
 
-        if not reason:
-            reason = f"Action requested by {moderator.name} ({moderator.id})"
-
-        await interaction.response.defer(ephemeral=True)
-
         if user_id in self.blacklisted_users:
             info = self.blacklisted_users[user_id]
             embed = discord.Embed(
                 title="🚫 User is in the Do Not Unban List",
                 description=(f"**Reason:** {info['reason']}\n"
                              f"**Listed by:** {info['added_by']}\n\n"
-                             "Are you sure you want to proceed with the unban?"),
-                color=discord.Color.orange()
+                             "You cannot unban this user.",
+                ),
+                color=discord.Color.red()
             )
-            return await interaction.followup.send(embed=embed)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        if not reason:
+            reason = f"Action requested by {moderator.name} ({moderator.id})"
+
+        await interaction.response.defer(ephemeral=True)
 
         guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global_flag else [interaction.guild]
         results = []
@@ -555,18 +556,19 @@ class ServerBan(red_commands.Cog):
                 self.cog = cog
                 self.user = user
                 self.escalated = False
+                self.escalator = None
 
             @discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
             async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
                 if self.escalated:
-                    return
+                    return await interaction.response.send_message("Already escalated.", ephemeral=True)
                 if not isinstance(interaction.user, discord.Member) or not any(role.id == ESCALATE_ROLE_ID for role in interaction.user.roles):
                     return await interaction.response.send_message("You don't have permission to escalate this user.", ephemeral=True)
                 modal = EscalationReasonModal(self.cog, self.user, self, button)
                 await interaction.response.send_modal(modal)
 
         class EscalationReasonModal(discord.ui.Modal):
-            def __init__(self, cog, target_user: discord.User, view: EscalateView, button: discord.ui.Button):
+            def __init__(self, cog, target_user, view, button):
                 super().__init__(title="Escalate to Do Not Unban")
                 self.cog = cog
                 self.target_user = target_user
@@ -588,6 +590,7 @@ class ServerBan(red_commands.Cog):
                 self.button.label = f"Escalated by {interaction.user.name}"
                 self.button.disabled = True
                 self.view.escalated = True
+                self.view.escalator = interaction.user.name
                 await interaction.message.edit(view=self.view)
                 await interaction.response.send_message("User successfully escalated and added to the Do Not Unban list.", ephemeral=True)
 
