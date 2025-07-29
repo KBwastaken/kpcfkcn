@@ -488,14 +488,16 @@ async def globalbansync(self, interaction, ephemeral: Optional[bool] = True):
         if chunk:
             chunks.append(chunk)
 
-for index, chunk in enumerate(chunks):
-    embed = discord.Embed(
-        title=f"Global Ban Sync Results ({index + 1}/{len(chunks)})",
-        description=chunk,
-        color=discord.Color.orange()
-    )
-    await interaction.followup.send(embed=embed, ephemeral=True)
+        if chunk:
+            chunks.append(chunk)
 
+        for index, chunk in enumerate(chunks):
+            embed = discord.Embed(
+                title=f"Global Ban Sync Results ({index + 1}/{len(chunks)})",
+                description=chunk,
+                color=discord.Color.orange()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
     log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
