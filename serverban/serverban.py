@@ -458,7 +458,7 @@ class ServerBan(red_commands.Cog):
                 ephemeral=True
             )
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
         results = []
 
         for guild in self.bot.guilds:
