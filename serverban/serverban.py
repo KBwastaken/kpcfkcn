@@ -261,7 +261,7 @@ async def bansync(self, interaction: discord.Interaction):
         user5="User ID #5 to ban (optional)",
         reason="Reason for banning (required)"
     )
-    @app_commands.checks.has_permissions(ban_members=True)
+@app_commands.checks.has_permissions(ban_members=True)
     
     async def massglobalban(
         self,
