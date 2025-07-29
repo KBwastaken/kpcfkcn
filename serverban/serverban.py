@@ -527,8 +527,8 @@ async def log_global_ban(self, user: discord.User, moderator: discord.User, reas
             self.cog = cog
             self.user = user
 
-        @discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
-        async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
+@discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
+async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
 if not isinstance(interaction.user, discord.Member) or not any(role.id == ESCALATE_ROLE_ID for role in interaction.user.roles):
     return await interaction.response.send_message("You don't have permission to escalate this user.", ephemeral=True)
 
