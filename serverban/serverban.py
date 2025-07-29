@@ -160,22 +160,19 @@ async def cog_load(self):
     app_commands.Choice(name="Yes", value="yes")
 ])
 @app_commands.checks.has_permissions(ban_members=True)
-async def sunban(
-    self,
-    interaction: discord.Interaction,
-    user_id: str,
-    is_global: Literal["yes", "no"],
-    reason: str = "Your application has been accepted. You may rejoin using the invite link."
-):
+async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
     try:
         user_id = int(user_id)
     except ValueError:
         return await interaction.response.send_message(embed=self._error_embed("Invalid user ID."), ephemeral=True)
 
-    is_global = is_global.lower() == "yes"
+    is_global_flag = is_global.value.lower() == "yes"
     moderator = interaction.user
 
-    await interaction.response.defer(ephemeral=False)
+    if not reason:
+        reason = f"Action requested by {moderator.name} ({moderator.id})"
+
+    await interaction.response.defer(ephemeral=True)
 
     if user_id in self.blacklisted_users:
         info = self.blacklisted_users[user_id]
@@ -188,7 +185,7 @@ async def sunban(
         )
         return await interaction.followup.send(embed=embed)
 
-    guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
+    guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global_flag else [interaction.guild]
     results = []
 
     for guild in guilds:
@@ -209,7 +206,7 @@ async def sunban(
     except discord.HTTPException:
         pass
 
-    if is_global:
+    if is_global_flag:
         self.global_ban_list.discard(user_id)
         self._save_global_bans()
 
@@ -222,7 +219,7 @@ async def sunban(
     ))
 
     try:
-        await interaction.channel.send(embed=self._action_embed(user, "unban", reason, moderator, is_global))
+        await interaction.channel.send(embed=self._action_embed(user, "unban", reason, moderator, is_global_flag))
     except Exception:
         pass
         
