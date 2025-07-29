@@ -505,7 +505,7 @@ class ServerBan(red_commands.Cog):
 
 @app_commands.command(name="globalbanstats", description="Show statistics about global bans.")
 async def globalbanstats(self, interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)  # <-- Fix: defer immediately
+    await interaction.response.defer(ephemeral=True)  # Defer immediately to avoid interaction timeout
 
     # Number of global bans
     num_global_bans = len(self.global_ban_list)
@@ -521,7 +521,8 @@ async def globalbanstats(self, interaction: discord.Interaction):
         except Exception:
             pass
 
-    # Last sync time in Europe/Amsterdam
+    # Last sync time in Europe/Amsterdam (GMT+1/+2 DST)
+    import pytz
     amsterdam = pytz.timezone("Europe/Amsterdam")
     if self.last_ban_sync:
         last_sync_str = self.last_ban_sync.astimezone(amsterdam).strftime("%Y-%m-%d %H:%M:%S Europe/Amsterdam")
@@ -536,7 +537,7 @@ async def globalbanstats(self, interaction: discord.Interaction):
     embed.add_field(name="Total Server Bans", value=str(total_bans), inline=True)
     embed.add_field(name="Last Ban Sync", value=last_sync_str, inline=False)
 
-    await interaction.followup.send(embed=embed, ephemeral=True)  # <-- Use followup
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
         log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
