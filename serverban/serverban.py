@@ -6,7 +6,6 @@ from redbot.core.bot import Red
 from typing import Optional
 import asyncio
 from datetime import datetime
-import pytz
 import json
 import os
 
@@ -15,8 +14,8 @@ ESCALATE_ROLE_ID = 1355526020827971705
 ESCALATE_GUILD_ID = 1196173063847411712
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380, 1113852494154579999}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
-BAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361786454862201075/c00kie-get-banned.gif"
-UNBAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361789020593455456/unban-fivem.gif"
+BAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823656997228574/c00kie-get-banned.gif?ex=688a66df&is=6889155f&hm=622d625cb9b1c6427aadf7ae36d82e11b7de478aa2249df8330b9f91f53d0af4&="
+UNBAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823787167449088/unban-fivem.gif?ex=688a66fe&is=6889157e&hm=beab5d6376d7e1721225b62a79ae428b5a8f4bbf327127213ee9395e249dfb9e&="
 BANLIST_FILE = "global_ban_list.json"
 
 class ServerBan(red_commands.Cog):
@@ -260,7 +259,7 @@ class ServerBan(red_commands.Cog):
             await interaction.followup.send(embed=embed)
         except discord.NotFound:
             await interaction.channel.send(embed=embed)
-        self.last_ban_sync = datetime.now(pytz.utc)  # Update last sync time
+        self.last_ban_sync = datetime.utcnow()  # Update last sync time
 
     @app_commands.command(name="massglobalban", description="Globally ban up to 5 users at once.")
     @app_commands.describe(
@@ -501,43 +500,41 @@ class ServerBan(red_commands.Cog):
                 color=discord.Color.orange()
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
-        self.last_ban_sync = datetime.now(pytz.utc)  # Update last sync time
+        self.last_ban_sync = datetime.utcnow()  # Update last sync time
 
-@app_commands.command(name="globalbanstats", description="Show statistics about global bans.")
-async def globalbanstats(self, interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)  # Defer immediately to avoid interaction timeout
+    @app_commands.command(name="globalbanstats", description="Show statistics about global bans.")
+    async def globalbanstats(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
 
-    # Number of global bans
-    num_global_bans = len(self.global_ban_list)
+        # Number of global bans
+        num_global_bans = len(self.global_ban_list)
 
-    # Total bans in all guilds (excluding blacklisted guilds)
-    total_bans = 0
-    for guild in self.bot.guilds:
-        if guild.id in self.server_blacklist:
-            continue
-        try:
-            bans = [entry async for entry in guild.bans()]
-            total_bans += len(bans)
-        except Exception:
-            pass
+        # Total bans in all guilds (excluding blacklisted guilds)
+        total_bans = 0
+        for guild in self.bot.guilds:
+            if guild.id in self.server_blacklist:
+                continue
+            try:
+                bans = [entry async for entry in guild.bans()]
+                total_bans += len(bans)
+            except Exception:
+                pass
 
-    # Last sync time in Europe/Amsterdam (GMT+1/+2 DST)
-    import pytz
-    amsterdam = pytz.timezone("Europe/Amsterdam")
-    if self.last_ban_sync:
-        last_sync_str = self.last_ban_sync.astimezone(amsterdam).strftime("%Y-%m-%d %H:%M:%S Europe/Amsterdam")
-    else:
-        last_sync_str = "Never"
+        # Last sync time (UTC)
+        if self.last_ban_sync:
+            last_sync_str = self.last_ban_sync.strftime("%Y-%m-%d %H:%M:%S UTC")
+        else:
+            last_sync_str = "Never"
 
-    embed = discord.Embed(
-        title="🌐 Global Ban Statistics",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="Global Bans", value=str(num_global_bans), inline=True)
-    embed.add_field(name="Total Server Bans", value=str(total_bans), inline=True)
-    embed.add_field(name="Last Ban Sync", value=last_sync_str, inline=False)
+        embed = discord.Embed(
+            title="🌐 Global Ban Statistics",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Global Bans", value=str(num_global_bans), inline=True)
+        embed.add_field(name="Total Server Bans", value=str(total_bans), inline=True)
+        embed.add_field(name="Last Ban Sync", value=last_sync_str, inline=False)
 
-    await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
         log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
