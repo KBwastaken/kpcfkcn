@@ -10,6 +10,9 @@ from datetime import datetime
 import json
 import os
 
+LOG_CHANNEL_ID = 1399770568114573395
+ESCALATE_ROLE_ID = 1355526020827971705
+ESCALATE_GUILD_ID = 1196173063847411712
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380, 1113852494154579999}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 BAN_GIF = "https://media.discordapp.net/attachments/1304911814857068605/1361786454862201075/c00kie-get-banned.gif"
@@ -56,6 +59,16 @@ class ServerBan(red_commands.Cog):
             await self.tree.sync()
         except Exception:
             pass
+
+    async def on_ready(self):
+    try:
+        await self.tree.sync()
+    except Exception:
+        pass
+
+if getattr(self, "_sync_task", None) is None or self._sync_task.done():
+    self._sync_task = asyncio.create_task(self.global_ban_sync_loop())
+
 
     @app_commands.command(name="sbanbl", description="Add or remove a user from the Do Not Unban list.")
     @app_commands.describe(user_id="User ID to add/remove", reason="Reason for blacklisting (if adding)")
@@ -142,6 +155,12 @@ class ServerBan(red_commands.Cog):
         await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
         await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global))
 
+    if is_global:
+    self.global_ban_list.add(user_id)
+    self._save_global_bans()
+    await self.log_global_ban(user, moderator, reason)
+
+
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
     @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
@@ -192,6 +211,9 @@ class ServerBan(red_commands.Cog):
         if is_global:
             self.global_ban_list.discard(user_id)
             self._save_global_bans()
+
+        await self.log_global_unban(user, moderator, reason)
+
 
         await interaction.followup.send(embed=discord.Embed(
             title="Unban Results",
@@ -251,6 +273,7 @@ class ServerBan(red_commands.Cog):
         reason="Reason for banning (required)"
     )
     @app_commands.checks.has_permissions(ban_members=True)
+    
     async def massglobalban(
         self,
         interaction: Interaction,
@@ -345,8 +368,18 @@ class ServerBan(red_commands.Cog):
                 description="\n".join(results),
                 color=discord.Color.orange()
             ),
-            ephemeral=True
-        )
+            ephemeral=True)
+        
+        if ban_success:
+    self.global_ban_list.add(user_id)
+    await self.log_global_ban(user, interaction.user, reason)
+    
+    if is_global:
+    self.global_ban_list.add(user_id)
+    self._save_global_bans()
+    await self.log_global_ban(user, moderator, reason)
+
+
 
     @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
     @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
@@ -482,4 +515,112 @@ class ServerBan(red_commands.Cog):
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-        
+        async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
+    log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
+    if not log_channel:
+        return
+
+    embed = discord.Embed(
+        title="🚨 Global Ban Issued",
+        description=f"{user.mention} (`{user.id}`) has been globally banned.",
+        color=discord.Color.red(),
+        timestamp=datetime.utcnow()
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+    embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+    embed.add_field(name="Moderator", value=f"{moderator} (`{moderator.id}`)", inline=False)
+    embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
+    embed.set_footer(text="Click 'Escalate' to add to Do Not Unban list.")
+
+    class EscalateView(discord.ui.View):
+        def __init__(self, cog, user):
+            super().__init__(timeout=None)
+            self.cog = cog
+            self.user = user
+
+        @discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
+        async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
+if not isinstance(interaction.user, discord.Member) or not any(role.id == ESCALATE_ROLE_ID for role in interaction.user.roles):
+    return await interaction.response.send_message("You don't have permission to escalate this user.", ephemeral=True)
+
+
+class EscalationReasonModal(discord.ui.Modal):
+    def __init__(self, cog, target_user: discord.User):
+        super().__init__(title="Escalate to Do Not Unban")
+        self.cog = cog
+        self.target_user = target_user
+        self.reason = discord.ui.TextInput(
+            label="Reason for Escalation",
+            style=discord.TextStyle.paragraph,
+            required=True
+        )
+        self.add_item(self.reason)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🚫 Escalation Submitted",
+            description=(
+                f"**User:** {self.target_user.mention} (`{self.target_user.id}`)\n"
+                f"**By:** {interaction.user.mention} (`{interaction.user.id}`)\n\n"
+                f"**Reason:** {self.reason.value}"
+            ),
+            color=discord.Color.orange(),
+            timestamp=datetime.utcnow()
+        )
+        target_guild = self.cog.bot.get_guild(ESCALATE_GUILD_ID)
+        if not target_guild:
+            return await interaction.response.send_message("Could not find the escalation guild.", ephemeral=True)
+
+        log_channel = target_guild.get_channel(LOG_CHANNEL_ID)
+        if not log_channel:
+            return await interaction.response.send_message("Could not find the escalation log channel.", ephemeral=True)
+
+        await log_channel.send(embed=embed)
+        await interaction.response.send_message("User successfully escalated.", ephemeral=True)
+
+
+    view = EscalateView(self, user)
+    await log_channel.send(embed=embed, view=view)
+
+async def log_global_unban(self, user: discord.User, moderator: discord.User, reason: str):
+    log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
+    if not log_channel:
+        return
+
+    embed = discord.Embed(
+        title="✅ Global Unban Issued",
+        description=f"{user.mention} (`{user.id}`) has been globally unbanned.",
+        color=discord.Color.green(),
+        timestamp=datetime.utcnow()
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+    embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+    embed.add_field(name="Moderator", value=f"{moderator} (`{moderator.id}`)", inline=False)
+    embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
+    embed.set_footer(text="Unban was synced across all eligible servers.")
+
+    await log_channel.send(embed=embed)
+
+
+
+async def global_ban_sync_loop(self):
+    await self.bot.wait_until_ready()
+    while not self.bot.is_closed():
+        for guild in self.bot.guilds:
+            if guild.id in self.server_blacklist:
+                continue
+            for user_id in list(self.global_ban_list):
+                try:
+                    already_banned = False
+                    async for entry in guild.bans():
+                        if entry.user.id == user_id:
+                            already_banned = True
+                            break
+                    if not already_banned:
+                        await guild.ban(discord.Object(id=user_id), reason="Scheduled global ban sync")
+                except discord.Forbidden:
+                    print(f"[GlobalBan Sync] Missing permissions in {guild.name} ({guild.id})")
+                except Exception as e:
+                    print(f"[GlobalBan Sync] Error in {guild.name}: {e}")
+        await asyncio.sleep(300)
+
