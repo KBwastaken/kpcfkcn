@@ -14,8 +14,8 @@ ESCALATE_ROLE_ID = 1355526020827971705
 ESCALATE_GUILD_ID = 1196173063847411712
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380, 1113852494154579999}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
-BAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823656997228574/c00kie-get-banned.gif?ex=688a66df&is=6889155f&hm=622d625cb9b1c6427aadf7ae36d82e11b7de478aa2249df8330b9f91f53d0af4&="
-UNBAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823787167449088/unban-fivem.gif?ex=688a66fe&is=6889157e&hm=beab5d6376d7e1721225b62a79ae428b5a8f4bbf327127213ee9395e249dfb9e&="
+BAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823656997228574/c00kie-get-banned.gif"
+UNBAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823787167449088/unban-fivem.gif"
 BANLIST_FILE = "global_ban_list.json"
 
 class ServerBan(red_commands.Cog):
@@ -147,11 +147,73 @@ class ServerBan(red_commands.Cog):
         if is_global_flag:
             self.global_ban_list.add(user_id)
             self._save_global_bans()
-
-        await self.log_global_ban(user, moderator, reason)
+            await self.log_global_ban(user, moderator, reason)
+        else:
+            await self.log_regular_ban(user, moderator, reason)
 
         await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
         await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global_flag))
+
+    async def log_regular_ban(self, user: discord.User, moderator: discord.User, reason: str):
+        log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
+        if not log_channel:
+            return
+
+        embed = discord.Embed(
+            title="🚨 Ban Issued",
+            description=f"{user.mention} (`{user.id}`) has been banned from the server.",
+            color=discord.Color.red(),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+        embed.add_field(name="Moderator", value=f"{moderator} (`{moderator.id}`)", inline=False)
+        embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
+        embed.set_footer(text="You may escalate to global ban.")
+
+        class RegularBanView(discord.ui.View):
+            def __init__(self, cog, user, moderator, reason):
+                super().__init__(timeout=None)
+                self.cog = cog
+                self.user = user
+                self.moderator = moderator
+                self.reason = reason
+                self.globaled = False
+
+            @discord.ui.button(label="🌐 Global Ban", style=discord.ButtonStyle.primary)
+            async def global_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
+                if self.globaled:
+                    return await interaction.response.send_message("Already globally banned.", ephemeral=True)
+                if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+                    return await interaction.response.send_message("You don't have permission to global ban.", ephemeral=True)
+                await self.cog.do_global_ban(self.user, self.moderator, self.reason, interaction)
+                self.globaled = True
+                button.style = discord.ButtonStyle.success
+                button.label = f"Globally banned by {interaction.user.name}"
+                button.disabled = True
+                await interaction.message.edit(view=self)
+                await interaction.response.send_message("User globally banned.", ephemeral=True)
+
+        view = RegularBanView(self, user, moderator, reason)
+        await log_channel.send(embed=embed, view=view)
+
+    async def do_global_ban(self, user: discord.User, moderator: discord.User, reason: str, interaction: discord.Interaction):
+        for guild in self.bot.guilds:
+            if guild.id in self.server_blacklist:
+                continue
+            try:
+                is_banned = False
+                async for entry in guild.bans():
+                    if entry.user.id == user.id:
+                        is_banned = True
+                        break
+                if not is_banned:
+                    await guild.ban(discord.Object(id=user.id), reason=reason)
+            except Exception:
+                pass
+        self.global_ban_list.add(user.id)
+        self._save_global_bans()
+        await self.log_global_ban(user, moderator, reason)
 
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
@@ -260,7 +322,7 @@ class ServerBan(red_commands.Cog):
             await interaction.followup.send(embed=embed)
         except discord.NotFound:
             await interaction.channel.send(embed=embed)
-        self.last_ban_sync = datetime.utcnow()  # Update last sync time
+        self.last_ban_sync = datetime.utcnow()
 
     @app_commands.command(name="massglobalban", description="Globally ban up to 5 users at once.")
     @app_commands.describe(
@@ -388,7 +450,7 @@ class ServerBan(red_commands.Cog):
 
         class BanListView(discord.ui.View):
             def __init__(self, entries, per_page, user, ephemeral):
-                super().__init__(timeout=300)
+                super().__init__(timeout=None)
                 self.entries = entries
                 self.per_page = per_page
                 self.user = user
@@ -501,7 +563,7 @@ class ServerBan(red_commands.Cog):
                 color=discord.Color.orange()
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
-        self.last_ban_sync = datetime.utcnow()  # Update last sync time
+        self.last_ban_sync = datetime.utcnow()
 
     @app_commands.command(name="globalbanstats", description="Show statistics about global bans.")
     async def globalbanstats(self, interaction: discord.Interaction):
