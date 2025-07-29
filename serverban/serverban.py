@@ -60,12 +60,6 @@ class ServerBan(red_commands.Cog):
         except Exception:
             pass
 
-    async def on_ready(self):
-    try:
-        await self.tree.sync()
-    except Exception:
-        pass
-
 if getattr(self, "_sync_task", None) is None or self._sync_task.done():
     self._sync_task = asyncio.create_task(self.global_ban_sync_loop())
 
