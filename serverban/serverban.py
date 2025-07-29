@@ -506,10 +506,7 @@ class ServerBan(red_commands.Cog):
     async def globalbanstats(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        # Number of global bans
         num_global_bans = len(self.global_ban_list)
-
-        # Total bans in all guilds (excluding blacklisted guilds)
         total_bans = 0
         for guild in self.bot.guilds:
             if guild.id in self.server_blacklist:
@@ -520,7 +517,6 @@ class ServerBan(red_commands.Cog):
             except Exception:
                 pass
 
-        # Last sync time (UTC)
         if self.last_ban_sync:
             last_sync_str = self.last_ban_sync.strftime("%Y-%m-%d %H:%M:%S UTC")
         else:
@@ -558,20 +554,24 @@ class ServerBan(red_commands.Cog):
                 super().__init__(timeout=None)
                 self.cog = cog
                 self.user = user
+                self.escalated = False
 
             @discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
             async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
+                if self.escalated:
+                    return
                 if not isinstance(interaction.user, discord.Member) or not any(role.id == ESCALATE_ROLE_ID for role in interaction.user.roles):
                     return await interaction.response.send_message("You don't have permission to escalate this user.", ephemeral=True)
-
-                modal = EscalationReasonModal(self.cog, self.user)
+                modal = EscalationReasonModal(self.cog, self.user, self, button)
                 await interaction.response.send_modal(modal)
 
         class EscalationReasonModal(discord.ui.Modal):
-            def __init__(self, cog, target_user: discord.User):
+            def __init__(self, cog, target_user: discord.User, view: EscalateView, button: discord.ui.Button):
                 super().__init__(title="Escalate to Do Not Unban")
                 self.cog = cog
                 self.target_user = target_user
+                self.view = view
+                self.button = button
                 self.reason = discord.ui.TextInput(
                     label="Reason for Escalation",
                     style=discord.TextStyle.paragraph,
@@ -580,26 +580,16 @@ class ServerBan(red_commands.Cog):
                 self.add_item(self.reason)
 
             async def on_submit(self, interaction: discord.Interaction):
-                embed = discord.Embed(
-                    title="🚫 Escalation Submitted",
-                    description=(
-                        f"**User:** {self.target_user.mention} (`{self.target_user.id}`)\n"
-                        f"**By:** {interaction.user.mention} (`{interaction.user.id}`)\n\n"
-                        f"**Reason:** {self.reason.value}"
-                    ),
-                    color=discord.Color.orange(),
-                    timestamp=datetime.utcnow()
-                )
-                target_guild = self.cog.bot.get_guild(ESCALATE_GUILD_ID)
-                if not target_guild:
-                    return await interaction.response.send_message("Could not find the escalation guild.", ephemeral=True)
-
-                log_channel = target_guild.get_channel(LOG_CHANNEL_ID)
-                if not log_channel:
-                    return await interaction.response.send_message("Could not find the escalation log channel.", ephemeral=True)
-
-                await log_channel.send(embed=embed)
-                await interaction.response.send_message("User successfully escalated.", ephemeral=True)
+                self.cog.blacklisted_users[self.target_user.id] = {
+                    "reason": self.reason.value,
+                    "added_by": str(interaction.user)
+                }
+                self.button.style = discord.ButtonStyle.success
+                self.button.label = f"Escalated by {interaction.user.name}"
+                self.button.disabled = True
+                self.view.escalated = True
+                await interaction.message.edit(view=self.view)
+                await interaction.response.send_message("User successfully escalated and added to the Do Not Unban list.", ephemeral=True)
 
         view = EscalateView(self, user)
         await log_channel.send(embed=embed, view=view)
