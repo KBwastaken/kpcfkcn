@@ -504,7 +504,7 @@ async def globalbansync(self, interaction, ephemeral: Optional[bool] = True):
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-        async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
+    async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
     log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
     if not log_channel:
         return
