@@ -146,10 +146,9 @@ if getattr(self, "_sync_task", None) is None or self._sync_task.done():
             self.global_ban_list.add(user_id)
             self._save_global_bans()
     await self.log_global_ban(user, moderator, reason)
-        
-
-        await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
-        await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global))
+    
+await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
+await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global))
 
     @app_commands.command(name="sunban", description="Unban a user by ID.")
     @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
