@@ -251,9 +251,9 @@ async def bansync(self, interaction: discord.Interaction):
             await interaction.followup.send(embed=embed)
         except discord.NotFound:
             await interaction.channel.send(embed=embed)
-
-    @app_commands.command(name="massglobalban", description="Globally ban up to 5 users at once.")
-    @app_commands.describe(
+            
+@app_commands.command(name="massglobalban", description="Globally ban up to 5 users at once.")
+@app_commands.describe(
         user1="User ID #1 to ban",
         user2="User ID #2 to ban (optional)",
         user3="User ID #3 to ban (optional)",
@@ -370,9 +370,9 @@ async def bansync(self, interaction: discord.Interaction):
 
 
 
-    @app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
-    @app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
-    async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optional[bool] = True):
+@app_commands.command(name="globalbanlist", description="Shows the list of globally banned users.")
+@app_commands.describe(ephemeral="Send the response as ephemeral (only visible to you).")
+async def globalbanlist(self, interaction: discord.Interaction, ephemeral: Optional[bool] = True):
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(
                 embed=self._error_embed("You are not authorized to use this command."),
@@ -453,8 +453,8 @@ async def bansync(self, interaction: discord.Interaction):
         await interaction.response.send_message(embed=view.get_current_embed(), view=view, ephemeral=ephemeral)
         
 
-    @app_commands.command(name="globalbansync", description="Sync all global bans across all servers.")
-    async def globalbansync(self, interaction, ephemeral: Optional[bool] = True):
+@app_commands.command(name="globalbansync", description="Sync all global bans across all servers.")
+async def globalbansync(self, interaction, ephemeral: Optional[bool] = True):
         if interaction.user.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message(
                 embed=self._error_embed("Only the bot owner can run this command."),
