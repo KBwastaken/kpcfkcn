@@ -359,11 +359,11 @@ async def massglobalban(
             ),
             ephemeral=True)
         
-        if ban_success:
-    self.global_ban_list.add(user_id),
+if ban_success:
+    self.global_ban_list.add(user_id)
     await self.log_global_ban(user, interaction.user, reason)
-    
-    if is_global:
+
+if is_global:
     self.global_ban_list.add(user_id)
     self._save_global_bans()
     await self.log_global_ban(user, moderator, reason)
