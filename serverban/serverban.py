@@ -27,6 +27,7 @@ class ServerBan(red_commands.Cog):
         self.server_blacklist = {1368969894242291742, 1298444715804327967}
         self._load_global_bans()
         self.active_messages = {}
+        self._sync_task = None
 
     def _load_global_bans(self):
         if os.path.exists(BANLIST_FILE):
@@ -60,8 +61,9 @@ class ServerBan(red_commands.Cog):
         except Exception:
             pass
 
-if getattr(self, "_sync_task", None) is None or self._sync_task.done():
-    self._sync_task = asyncio.create_task(self.global_ban_sync_loop())
+async def cog_load(self):
+    if getattr(self, "_sync_task", None) is None or self._sync_task.done():
+        self._sync_task = asyncio.create_task(self.global_ban_sync_loop())
 
 
     @app_commands.command(name="sbanbl", description="Add or remove a user from the Do Not Unban list.")
