@@ -263,7 +263,7 @@ async def bansync(self, interaction: discord.Interaction):
     )
 @app_commands.checks.has_permissions(ban_members=True)
     
-    async def massglobalban(
+async def massglobalban(
         self,
         interaction: Interaction,
         user1: str,
