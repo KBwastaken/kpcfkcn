@@ -12,7 +12,7 @@ import os
 LOG_CHANNEL_ID = 1399770568114573395
 ESCALATE_ROLE_ID = 1355526020827971705
 ESCALATE_GUILD_ID = 1196173063847411712
-ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113852494154579999}
+ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153, 1113451234477752380, 1113852494154579999}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 BAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823656997228574/c00kie-get-banned.gif"
 UNBAN_GIF = "https://media.discordapp.net/attachments/1387199076675747874/1399823787167449088/unban-fivem.gif"
@@ -154,48 +154,48 @@ class ServerBan(red_commands.Cog):
         await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
         await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global_flag))
 
-async def log_regular_ban(self, user: discord.User, moderator: discord.User, reason: str, guild: discord.Guild):
-    log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
-    if not log_channel:
-        return
+    async def log_regular_ban(self, user: discord.User, moderator: discord.User, reason: str):
+        log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
+        if not log_channel:
+            return
 
-    embed = discord.Embed(
-        title="🚨 Ban Issued",
-        description=f"{user.mention} (`{user.id}`) has been banned from {guild.name}.",
-        color=discord.Color.red(),
-        timestamp=datetime.utcnow()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
-    embed.add_field(name="Moderator", value=f"{moderator} (`{moderator.id}`)", inline=False)
-    embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
-    embed.set_footer(text="You may escalate to global ban.")
+        embed = discord.Embed(
+            title="🚨 Ban Issued",
+            description=f"{user.mention} (`{user.id}`) has been banned from {guild.name}.",
+            color=discord.Color.red(),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
+        embed.add_field(name="Moderator", value=f"{moderator} (`{moderator.id}`)", inline=False)
+        embed.add_field(name="Reason", value=reason or "No reason provided.", inline=False)
+        embed.set_footer(text="You may escalate to global ban.")
 
-    class RegularBanView(discord.ui.View):
-        def __init__(self, cog, user, moderator, reason):
-            super().__init__(timeout=None)
-            self.cog = cog
-            self.user = user
-            self.moderator = moderator
-            self.reason = reason
-            self.globaled = False
+        class RegularBanView(discord.ui.View):
+            def __init__(self, cog, user, moderator, reason):
+                super().__init__(timeout=None)
+                self.cog = cog
+                self.user = user
+                self.moderator = moderator
+                self.reason = reason
+                self.globaled = False
 
-        @discord.ui.button(label="🌐 Global Ban", style=discord.ButtonStyle.primary)
-        async def global_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if self.globaled:
-                return await interaction.response.send_message("Already globally banned.", ephemeral=True)
-            if interaction.user.id not in ALLOWED_GLOBAL_IDS:
-                return await interaction.response.send_message("You don't have permission to global ban.", ephemeral=True)
-            await self.cog.do_global_ban(self.user, self.moderator, self.reason, interaction)
-            self.globaled = True
-            button.style = discord.ButtonStyle.success
-            button.label = f"Globally banned by {interaction.user.name}"
-            button.disabled = True
-            await interaction.message.edit(view=self)
-            await interaction.response.send_message("User globally banned.", ephemeral=True)
+            @discord.ui.button(label="🌐 Global Ban", style=discord.ButtonStyle.primary)
+            async def global_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
+                if self.globaled:
+                    return await interaction.response.send_message("Already globally banned.", ephemeral=True)
+                if interaction.user.id not in ALLOWED_GLOBAL_IDS:
+                    return await interaction.response.send_message("You don't have permission to global ban.", ephemeral=True)
+                await self.cog.do_global_ban(self.user, self.moderator, self.reason, interaction)
+                self.globaled = True
+                button.style = discord.ButtonStyle.success
+                button.label = f"Globally banned by {interaction.user.name}"
+                button.disabled = True
+                await interaction.message.edit(view=self)
+                await interaction.response.send_message("User globally banned.", ephemeral=True)
 
-    view = RegularBanView(self, user, moderator, reason)
-    await log_channel.send(embed=embed, view=view)
+        view = RegularBanView(self, user, moderator, reason)
+        await log_channel.send(embed=embed, view=view)
 
     async def do_global_ban(self, user: discord.User, moderator: discord.User, reason: str, interaction: discord.Interaction):
         for guild in self.bot.guilds:
