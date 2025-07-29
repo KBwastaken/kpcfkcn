@@ -150,10 +150,10 @@ if getattr(self, "_sync_task", None) is None or self._sync_task.done():
 await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
 await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global))
 
-    @app_commands.command(name="sunban", description="Unban a user by ID.")
-    @app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
-    @app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
-    @app_commands.checks.has_permissions(ban_members=True)
+@app_commands.command(name="sunban", description="Unban a user by ID.")
+@app_commands.describe(user_id="User ID to unban", is_global="Unban in all servers?", reason="Reason for unbanning")
+@app_commands.choices(is_global=[app_commands.Choice(name="No", value="no"), app_commands.Choice(name="Yes", value="yes")])
+@app_commands.checks.has_permissions(ban_members=True)
     async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = "Your application has been accepted. You may rejoin using the invite link."):
         try:
             user_id = int(user_id)
