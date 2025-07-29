@@ -125,27 +125,29 @@ if getattr(self, "_sync_task", None) is None or self._sync_task.done():
         except discord.HTTPException:
             pass
 
-        guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
-        results = []
-        for guild in guilds:
-            try:
-                is_banned = False
-                async for entry in guild.bans():
-                    if entry.user.id == user_id:
-                        is_banned = True
-                        break
-                if not is_banned:
-                    await guild.ban(discord.Object(id=user_id), reason=reason)
-                    results.append(f"✅ {guild.name}")
-                else:
-                    results.append(f"⚠️ {guild.name}: Already banned")
-            except Exception as e:
-                results.append(f"❌ {guild.name}: {e}")
+guilds = [g for g in self.bot.guilds if g.id not in self.server_blacklist] if is_global else [interaction.guild]
+results = []
 
-        if is_global:
-            self.global_ban_list.add(user_id)
-            self._save_global_bans()
-    await self.log_global_ban(user, moderator, reason)
+for guild in guilds:
+    try:
+        is_banned = False
+        async for entry in guild.bans():
+            if entry.user.id == user_id:
+                is_banned = True
+                break
+        if not is_banned:
+            await guild.ban(discord.Object(id=user_id), reason=reason)
+            results.append(f"✅ {guild.name}")
+        else:
+            results.append(f"⚠️ {guild.name}: Already banned")
+    except Exception as e:
+        results.append(f"❌ {guild.name}: {e}")
+
+if is_global:
+    self.global_ban_list.add(user_id)
+    self._save_global_bans()
+
+await self.log_global_ban(user, moderator, reason)
     
 await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
 await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global))
