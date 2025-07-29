@@ -149,7 +149,7 @@ class ServerBan(red_commands.Cog):
             self._save_global_bans()
             await self.log_global_ban(user, moderator, reason)
         else:
-            await self.log_regular_ban(user, moderator, reason)
+            await self.log_regular_ban(user, moderator, reason, interaction.guild)
 
         await interaction.followup.send(embed=discord.Embed(title="Ban Results", description="\n".join(results), color=discord.Color.orange()))
         await interaction.channel.send(embed=self._action_embed(user, "ban", reason, moderator, is_global_flag))
@@ -159,11 +159,11 @@ class ServerBan(red_commands.Cog):
         if not log_channel:
             return
 
-        embed = discord.Embed(
-            title="🚨 Ban Issued",
-            description=f"{user.mention} (`{user.id}`) has been banned from the server.",
-            color=discord.Color.red(),
-            timestamp=datetime.utcnow()
+    embed = discord.Embed(
+        title="🚨 Ban Issued",
+        description=f"{user.mention} (`{user.id}`) has been banned from {guild.name}.",
+        color=discord.Color.red(),
+        timestamp=datetime.utcnow()
         )
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="User", value=f"{user} (`{user.id}`)", inline=False)
