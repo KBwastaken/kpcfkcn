@@ -497,12 +497,13 @@ async def globalbansync(self, interaction, ephemeral: Optional[bool] = True):
             chunks.append(chunk)
 
         for index, chunk in enumerate(chunks):
-            embed = discord.Embed(
-                title=f"Global Ban Sync Results ({index + 1}/{len(chunks)})",
-                description=chunk,
-                color=discord.Color.orange()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+embed = discord.Embed(
+    title=f"Global Ban Sync Results ({index + 1}/{len(chunks)})",
+    description=chunk,
+    color=discord.Color.orange()
+)
+await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
     log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
@@ -527,49 +528,51 @@ async def log_global_ban(self, user: discord.User, moderator: discord.User, reas
             self.cog = cog
             self.user = user
 
-@discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
-async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
-    if not isinstance(interaction.user, discord.Member) or not any(role.id == ESCALATE_ROLE_ID for role in interaction.user.roles):
-    return await interaction.response.send_message("You don't have permission to escalate this user.", ephemeral=True)
+        @discord.ui.button(label="🚫 Escalate", style=discord.ButtonStyle.danger)
+        async def escalate(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if not isinstance(interaction.user, discord.Member) or not any(role.id == ESCALATE_ROLE_ID for role in interaction.user.roles):
+                return await interaction.response.send_message("You don't have permission to escalate this user.", ephemeral=True)
 
+            modal = EscalationReasonModal(self.cog, self.user)
+            await interaction.response.send_modal(modal)
 
-class EscalationReasonModal(discord.ui.Modal):
-    def __init__(self, cog, target_user: discord.User):
-        super().__init__(title="Escalate to Do Not Unban")
-        self.cog = cog
-        self.target_user = target_user
-        self.reason = discord.ui.TextInput(
-            label="Reason for Escalation",
-            style=discord.TextStyle.paragraph,
-            required=True
-        )
-        self.add_item(self.reason)
+    class EscalationReasonModal(discord.ui.Modal):
+        def __init__(self, cog, target_user: discord.User):
+            super().__init__(title="Escalate to Do Not Unban")
+            self.cog = cog
+            self.target_user = target_user
+            self.reason = discord.ui.TextInput(
+                label="Reason for Escalation",
+                style=discord.TextStyle.paragraph,
+                required=True
+            )
+            self.add_item(self.reason)
 
-    async def on_submit(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="🚫 Escalation Submitted",
-            description=(
-                f"**User:** {self.target_user.mention} (`{self.target_user.id}`)\n"
-                f"**By:** {interaction.user.mention} (`{interaction.user.id}`)\n\n"
-                f"**Reason:** {self.reason.value}"
-            ),
-            color=discord.Color.orange(),
-            timestamp=datetime.utcnow()
-        )
-        target_guild = self.cog.bot.get_guild(ESCALATE_GUILD_ID)
-        if not target_guild:
-            return await interaction.response.send_message("Could not find the escalation guild.", ephemeral=True)
+        async def on_submit(self, interaction: discord.Interaction):
+            embed = discord.Embed(
+                title="🚫 Escalation Submitted",
+                description=(
+                    f"**User:** {self.target_user.mention} (`{self.target_user.id}`)\n"
+                    f"**By:** {interaction.user.mention} (`{interaction.user.id}`)\n\n"
+                    f"**Reason:** {self.reason.value}"
+                ),
+                color=discord.Color.orange(),
+                timestamp=datetime.utcnow()
+            )
+            target_guild = self.cog.bot.get_guild(ESCALATE_GUILD_ID)
+            if not target_guild:
+                return await interaction.response.send_message("Could not find the escalation guild.", ephemeral=True)
 
-        log_channel = target_guild.get_channel(LOG_CHANNEL_ID)
-        if not log_channel:
-            return await interaction.response.send_message("Could not find the escalation log channel.", ephemeral=True)
+            log_channel = target_guild.get_channel(LOG_CHANNEL_ID)
+            if not log_channel:
+                return await interaction.response.send_message("Could not find the escalation log channel.", ephemeral=True)
 
-        await log_channel.send(embed=embed)
-        await interaction.response.send_message("User successfully escalated.", ephemeral=True)
-
+            await log_channel.send(embed=embed)
+            await interaction.response.send_message("User successfully escalated.", ephemeral=True)
 
     view = EscalateView(self, user)
     await log_channel.send(embed=embed, view=view)
+
 
 async def log_global_unban(self, user: discord.User, moderator: discord.User, reason: str):
     log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
@@ -589,7 +592,6 @@ async def log_global_unban(self, user: discord.User, moderator: discord.User, re
     embed.set_footer(text="Unban was synced across all eligible servers.")
 
     await log_channel.send(embed=embed)
-
 
 
 async def global_ban_sync_loop(self):
@@ -612,4 +614,5 @@ async def global_ban_sync_loop(self):
                 except Exception as e:
                     print(f"[GlobalBan Sync] Error in {guild.name}: {e}")
         await asyncio.sleep(300)
+
 
