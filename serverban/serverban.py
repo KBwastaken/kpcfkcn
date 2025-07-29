@@ -503,38 +503,40 @@ class ServerBan(red_commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
         self.last_ban_sync = datetime.now(pytz.utc)  # Update last sync time
 
-    @app_commands.command(name="globalbanstats", description="Show statistics about global bans.")
-    async def globalbanstats(self, interaction: discord.Interaction):
-        # Number of global bans
-        num_global_bans = len(self.global_ban_list)
+@app_commands.command(name="globalbanstats", description="Show statistics about global bans.")
+async def globalbanstats(self, interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)  # <-- Fix: defer immediately
 
-        # Total bans in all guilds (excluding blacklisted guilds)
-        total_bans = 0
-        for guild in self.bot.guilds:
-            if guild.id in self.server_blacklist:
-                continue
-            try:
-                bans = [entry async for entry in guild.bans()]
-                total_bans += len(bans)
-            except Exception:
-                pass
+    # Number of global bans
+    num_global_bans = len(self.global_ban_list)
 
-        # Last sync time in Europe/Amsterdam
-        amsterdam = pytz.timezone("Europe/Amsterdam")
-        if self.last_ban_sync:
-            last_sync_str = self.last_ban_sync.astimezone(amsterdam).strftime("%Y-%m-%d %H:%M:%S Europe/Amsterdam")
-        else:
-            last_sync_str = "Never"
+    # Total bans in all guilds (excluding blacklisted guilds)
+    total_bans = 0
+    for guild in self.bot.guilds:
+        if guild.id in self.server_blacklist:
+            continue
+        try:
+            bans = [entry async for entry in guild.bans()]
+            total_bans += len(bans)
+        except Exception:
+            pass
 
-        embed = discord.Embed(
-            title="🌐 Global Ban Statistics",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="Global Bans", value=str(num_global_bans), inline=True)
-        embed.add_field(name="Total Server Bans", value=str(total_bans), inline=True)
-        embed.add_field(name="Last Ban Sync", value=last_sync_str, inline=False)
+    # Last sync time in Europe/Amsterdam
+    amsterdam = pytz.timezone("Europe/Amsterdam")
+    if self.last_ban_sync:
+        last_sync_str = self.last_ban_sync.astimezone(amsterdam).strftime("%Y-%m-%d %H:%M:%S Europe/Amsterdam")
+    else:
+        last_sync_str = "Never"
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    embed = discord.Embed(
+        title="🌐 Global Ban Statistics",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="Global Bans", value=str(num_global_bans), inline=True)
+    embed.add_field(name="Total Server Bans", value=str(total_bans), inline=True)
+    embed.add_field(name="Last Ban Sync", value=last_sync_str, inline=False)
+
+    await interaction.followup.send(embed=embed, ephemeral=True)  # <-- Use followup
 
     async def log_global_ban(self, user: discord.User, moderator: discord.User, reason: str):
         log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
