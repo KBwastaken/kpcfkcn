@@ -699,10 +699,7 @@ class ServerBan(red_commands.Cog):
                         print(f"[GlobalBan Sync] Error in {guild.name}: {e}")
             await asyncio.sleep(300)
             
-            from discord import app_commands
 
-
-    class GlobalBanUserCommand:
     @app_commands.context_menu(name="Global Ban")
     async def global_ban_user(self, interaction: discord.Interaction, target_user: discord.Member):
         """
@@ -715,7 +712,6 @@ class ServerBan(red_commands.Cog):
                 ephemeral=True
             )
 
-        # Reason placeholder
         reason = f"Global ban requested by {interaction.user.name} ({interaction.user.id})"
 
         await interaction.response.defer(ephemeral=True)
@@ -766,3 +762,10 @@ class ServerBan(red_commands.Cog):
             ),
             ephemeral=True
         )
+
+    async def cog_load(self):
+        # Register the user command
+        self.bot.tree.add_command(self.global_ban_user)
+
+
+
